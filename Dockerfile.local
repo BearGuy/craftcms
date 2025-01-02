@@ -1,0 +1,14 @@
+FROM scratch
+
+# Copy the binary from the downloaded release
+COPY craftcms /craftcms
+
+# Create necessary directories
+COPY templates /templates
+COPY static /static
+COPY data /data
+
+EXPOSE 8080
+
+ENTRYPOINT ["/craftcms"]
+CMD ["serve"]
