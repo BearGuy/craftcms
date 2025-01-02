@@ -1,47 +1,46 @@
-name: Build and Test
-
+name: Build and Release
 on:
-  push:
-    branches: [main]
-    tags:
-      - "v*" # Add this to trigger on version tags
-  pull_request:
-    branches: [main]
+ push:
+   branches: [main]
+   tags: ["v*"]
+ pull_request:
+   branches: [main]
 
 jobs:
-  build:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
+ build:
+   strategy:
+     matrix:
+       target: [x86_64-unknown-linux-musl, aarch64-unknown-linux-musl]
+   runs-on: ubuntu-latest
+   steps:
+     - uses: actions/checkout@v3
+     - uses: Swatinem/rust-cache@v2
+     - uses: actions-rs/toolchain@v1
+       with:
+         toolchain: stable
+         target: ${{ matrix.target }}
+         profile: minimal
 
-      - name: Set up Rust
-        uses: actions-rs/toolchain@v1
-        with:
-          toolchain: stable
-          target: x86_64-unknown-linux-musl
-          profile: minimal
+     - name: Install musl-tools
+       run: |
+         sudo apt-get update
+         sudo apt-get install -y musl-tools
 
-      - name: Build static binary
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y musl-tools
-          RUSTFLAGS='-C target-feature=+crt-static -C link-arg=-static' cargo build --release --target x86_64-unknown-linux-musl
+     - name: Build
+       run: cargo build --release --target ${{ matrix.target }}
 
-      # - name: Build Docker image
-      #   run: docker build -t craftcms .
+     - name: Verify static
+       run: ldd target/${{ matrix.target }}/release/craftcms | grep -q "statically linked"
 
-      # - name: Test Docker container
-      #   run: |
-      #     docker run --rm craftcms init-db
-      #     docker run -d -p 3030:3030 --name craftcms craftcms serve
-      #     sleep 5
-      #     curl -f http://localhost:3030 || exit 1
+     - name: Generate checksum
+       run: sha256sum target/${{ matrix.target }}/release/craftcms > craftcms-${{ matrix.target }}.sha256
 
-      - name: Release
-        if: startsWith(github.ref, 'refs/tags/')
-        uses: softprops/action-gh-release@v1
-        with:
-          files: |
-            target/x86_64-unknown-linux-musl/release/craftcms
-        env:
-          GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
+     - name: Release
+       if: startsWith(github.ref, 'refs/tags/')
+       uses: softprops/action-gh-release@v1
+       with:
+         files: |
+           target/${{ matrix.target }}/release/craftcms
+           craftcms-${{ matrix.target }}.sha256
+       env:
+         GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
