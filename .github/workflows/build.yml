@@ -19,7 +19,7 @@ jobs:
           profile: minimal
 
       - name: Build
-        run: cargo build --release --target x86_64-unknown-linux-musl
+        run: cargo build --release
 
       - name: Build Docker image
         run: docker build -t craftcms .
