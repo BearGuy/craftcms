@@ -10,6 +10,9 @@ RUN apt-get update && apt-get install -y \
 WORKDIR /usr/src/craftcms
 COPY . .
 
+# Create data directory
+RUN mkdir -p data
+
 # Build release version
 RUN cargo build --release
 
@@ -24,7 +27,7 @@ COPY --from=builder /usr/src/craftcms/templates /templates
 # COPY --from=builder /usr/src/craftcms/assets /assets
 COPY --from=builder /usr/src/craftcms/static /static
 
-# Create data directory for SQLite
+# Copy empty data directory
 COPY --from=builder /usr/src/craftcms/data /data
 
 # Set the binary as entrypoint
