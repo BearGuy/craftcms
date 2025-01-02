@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>{{ title }}</title>
+        <meta name="description" content="{{ description }}" />
+        <link
+            href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600&display=swap"
+            rel="stylesheet"
+        />
+        <link rel="stylesheet" href="/static/css/style.css" />
+        <link rel="icon" href="/static/favicon.png" />
+
+        <!-- Open Graph / Facebook -->
+        <meta property="og:type" content="website" />
+        <meta property="og:url" content="{{ url }}" />
+        <meta property="og:title" content="{{ title }}" />
+        <meta property="og:description" content="{{description}}" />
+        <!-- <meta property="og:image" content="https://www.muddyventure.fly.dev/path/to/og-image.jpg"> -->
+
+        <!-- Twitter -->
+        <meta property="twitter:card" content="summary_large_image" />
+        <meta property="twitter:url" content="{{ url }}" />
+        <meta property="twitter:title" content="{{ title }}" />
+        <meta property="twitter:description" content="{{description}}" />
+        <!--<meta property="twitter:image" content="https://www.muddyventure.fly.dev/path/to/twitter-image.jpg">-->
+
+        <!-- Other meta tags -->
+        <link rel="canonical" href="https://www.muddyventure.fly.dev" />
+        <meta name="robots" content="index, follow" />
+        <meta name="author" content="{{ author }}" />
+    </head>
+    <body>
+        <div class="container">
+            {% include "sidebar.html" %}
+            <main class="main-content">
+                <article class="tattoo-detail">
+                    <a href="/" class="back-link" aria-label="Back to Gallery">
+                        <svg
+                            width="24"
+                            height="24"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            xmlns="http://www.w3.org/2000/svg"
+                        >
+                            <path
+                                d="M19 12H5M5 12L12 19M5 12L12 5"
+                                stroke="currentColor"
+                                stroke-width="2"
+                                stroke-linecap="round"
+                                stroke-linejoin="round"
+                            />
+                        </svg>
+                    </a>
+                    <h2>{{image.alt}}</h2>
+                    <div class="tattoo-image-container">
+                        <img
+                            src="/images/{{image.slug}}"
+                            alt="{{image.alt}}"
+                            class="tattoo-image"
+                            loading="lazy"
+                        />
+                    </div>
+                    <p class="tattoo-description">{{ image.description}}</p>
+                    <div class="keywords">
+                        {% for keyword in image.keywords %}
+                        <span class="keyword">{{keyword}}</span>
+                        {% endfor %}
+                    </div>
+                </article>
+            </main>
+        </div>
+        <script src="/static/js/script.js"></script>
+    </body>
+</html>

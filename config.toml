@@ -1,0 +1,13 @@
+[site]
+name = "MuddyVenture"
+title = "MuddyVenture - Handcrafted Pottery & Ceramic Art in Kingston"
+description = "Explore unique handcrafted pottery and ceramic art by MuddyVenture. Each piece is thoughtfully designed and hand-thrown in Ottawa, featuring nature-inspired glazes and botanical motifs."
+base_url = "https://www.muddyventure.fly.dev"
+
+[routes]
+detail_path = "pottery" # This will be used in URLs like /pottery/{slug}
+images_path = "images"  # This will be used in URLs like /images/{slug}
+
+[meta]
+author = "Manjot Patel"
+creator_suffix = "Pottery by Manjot" # Used in titles like "{item} - Pottery by Manjot"

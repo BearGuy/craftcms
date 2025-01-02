@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>Edit Image - {{ site_name }}</title>
+        <link rel="stylesheet" href="/admin/assets/css/admin.css" />
+    </head>
+    <body>
+        <header>
+            <h1>{{ site_name }} Admin</h1>
+            <nav>
+                <a href="/admin">Back to Gallery</a>
+                <button onclick="logout()" class="logout-button">Logout</button>
+            </nav>
+        </header>
+
+        <main>
+            <h2>Edit Image</h2>
+
+            <div class="admin-gallery-item" style="margin-bottom: 2rem">
+                <img src="/images/{{ image.slug }}" alt="{{ image.alt }}" />
+                <h3>Current Image: {{ image.alt }}</h3>
+                <div class="metadata">
+                    <div class="slug">{{ image.slug }}</div>
+                    <div class="keywords">
+                        {% for keyword in image.keywords %}
+                        <span class="keyword">{{ keyword }}</span>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+
+            <form
+                action="/admin/update/{{ image.slug }}"
+                method="post"
+                enctype="multipart/form-data"
+            >
+                <div class="form-group">
+                    <label for="alt">Alt Text:</label>
+                    <input
+                        type="text"
+                        id="alt"
+                        name="alt"
+                        value="{{ image.alt }}"
+                        required
+                    />
+                </div>
+
+                <div class="form-group">
+                    <label for="description">Description:</label>
+                    <textarea id="description" name="description" required>
+{{ image.description }}</textarea
+                    >
+                </div>
+
+                <div class="form-group">
+                    <label for="slug">Slug:</label>
+                    <input
+                        type="text"
+                        id="slug"
+                        name="slug"
+                        value="{{ image.slug }}"
+                        required
+                    />
+                </div>
+
+                <div class="form-group">
+                    <label for="keywords">Keywords (comma-separated):</label>
+                    <input
+                        type="text"
+                        id="keywords"
+                        name="keywords"
+                        value="{{ image.keywords | join(sep=',') }}"
+                    />
+                </div>
+
+                <div class="form-group">
+                    <label for="image">New Image (optional):</label>
+                    <input
+                        type="file"
+                        id="image"
+                        name="image"
+                        accept="image/*"
+                    />
+                </div>
+
+                <button
+                    type="submit"
+                    style="background-color: var(--accent-color)"
+                >
+                    Update Image
+                </button>
+            </form>
+        </main>
+        <script src="/admin/assets/js/admin.js"></script>
+    </body>
+</html>

@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>Add New Image - {{ site_name }}</title>
+        <link rel="stylesheet" href="/admin/assets/css/admin.css" />
+    </head>
+    <body>
+        <header>
+            <h1>{{ site_name }} Admin</h1>
+            <nav>
+                <a href="/admin">Back to Gallery</a>
+                <button onclick="logout()" class="logout-button">Logout</button>
+            </nav>
+        </header>
+
+        <main>
+            <h2>Add New Image</h2>
+
+            <form
+                action="/admin/create"
+                method="post"
+                enctype="multipart/form-data"
+            >
+                <div class="form-group">
+                    <label for="alt">Alt Text:</label>
+                    <input
+                        type="text"
+                        id="alt"
+                        name="alt"
+                        required
+                        placeholder="Descriptive text for the image"
+                    />
+                </div>
+
+                <div class="form-group">
+                    <label for="description">Description:</label>
+                    <textarea
+                        id="description"
+                        name="description"
+                        required
+                        placeholder="Detailed description of the image"
+                    ></textarea>
+                </div>
+
+                <div class="form-group">
+                    <label for="slug">Slug:</label>
+                    <input
+                        type="text"
+                        id="slug"
+                        name="slug"
+                        required
+                        placeholder="url-friendly-name"
+                    />
+                </div>
+
+                <div class="form-group">
+                    <label for="keywords">Keywords (comma-separated):</label>
+                    <input
+                        type="text"
+                        id="keywords"
+                        name="keywords"
+                        placeholder="ceramic, pottery, handmade"
+                    />
+                </div>
+
+                <div class="form-group">
+                    <label for="image">Image File:</label>
+                    <input
+                        type="file"
+                        id="image"
+                        name="image"
+                        accept="image/*"
+                        required
+                    />
+                    <div class="image-preview"></div>
+                </div>
+
+                <button
+                    type="submit"
+                    style="background-color: var(--success-color)"
+                >
+                    Create Image
+                </button>
+            </form>
+        </main>
+
+        <script>
+            // Image preview functionality
+            const imageInput = document.querySelector("#image");
+            const imagePreview = document.querySelector(".image-preview");
+
+            imageInput.addEventListener("change", function () {
+                const file = this.files[0];
+                if (file) {
+                    const reader = new FileReader();
+                    reader.onload = function (e) {
+                        imagePreview.innerHTML = `<img src="${e.target.result}" alt="Preview">`;
+                        imagePreview.classList.add("active");
+                    };
+                    reader.readAsDataURL(file);
+                }
+            });
+
+            // Simple slug generator from alt text
+            const altInput = document.querySelector("#alt");
+            const slugInput = document.querySelector("#slug");
+
+            altInput.addEventListener("input", function () {
+                if (!slugInput.value) {
+                    // Only update if slug is empty
+                    slugInput.value = this.value
+                        .toLowerCase()
+                        .replace(/[^a-z0-9]+/g, "-")
+                        .replace(/(^-|-$)/g, "");
+                }
+            });
+        </script>
+        <script src="/admin/assets/js/admin.js"></script>
+    </body>
+</html>

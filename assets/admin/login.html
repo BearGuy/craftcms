@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>Login - {{ site_name }}</title>
+        <link rel="stylesheet" href="/admin/assets/css/admin.css" />
+        <link rel="stylesheet" href="/admin/assets/css/login.css" />
+    </head>
+    <body class="login-page">
+        <main class="login-container">
+            <div class="login-box">
+                <h1>{{ site_name }}</h1>
+                <h2>Admin Login</h2>
+
+                <div
+                    id="error-message"
+                    class="message error"
+                    style="display: none"
+                ></div>
+
+                <form
+                    id="login-form"
+                    class="login-form"
+                    method="POST"
+                    action="/admin/login"
+                >
+                    <div class="form-group">
+                        <label for="email">Email</label>
+                        <input type="email" id="email" name="email" required />
+                    </div>
+
+                    <div class="form-group">
+                        <label for="password">Password</label>
+                        <input
+                            type="password"
+                            id="password"
+                            name="password"
+                            required
+                        />
+                    </div>
+
+                    <button type="submit" class="login-button">Log In</button>
+                </form>
+            </div>
+        </main>
+
+        <script>
+            document
+                .getElementById("login-form")
+                .addEventListener("submit", async (e) => {
+                    e.preventDefault();
+
+                    try {
+                        const response = await fetch("/admin/login", {
+                            method: "POST",
+                            headers: {
+                                "Content-Type": "application/json",
+                            },
+                            body: JSON.stringify({
+                                email: e.target.email.value,
+                                password: e.target.password.value,
+                            }),
+                        });
+
+                        if (!response.ok) {
+                            throw new Error("Login failed");
+                        }
+
+                        // Redirect to admin dashboard - the session cookie will be automatically included
+                        window.location.href = "/admin";
+                    } catch (error) {
+                        alert("Login failed. Please try again.");
+                    }
+                });
+        </script>
+    </body>
+</html>

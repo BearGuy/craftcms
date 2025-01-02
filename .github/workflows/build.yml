@@ -1,0 +1,39 @@
+name: Build and Test
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Set up Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          profile: minimal
+
+      - name: Build
+        run: cargo build --release
+
+      - name: Build Docker image
+        run: docker build -t craftcms .
+
+      - name: Test Docker container
+        run: |
+          # Initialize the database first
+          docker run --rm craftcms init-db
+
+          # Start the server
+          docker run -d -p 3030:3030 --name craftcms craftcms serve
+
+          # Give the server time to start
+          sleep 5
+
+          # Basic health check
+          curl -f http://localhost:3030 || exit 1

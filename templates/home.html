@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>{{title}}</title>
+        <meta name="description" content="{{description}}" />
+        <link rel="icon" href="/static/favicon.png" />
+
+        <!-- Open Graph / Facebook -->
+        <meta property="og:type" content="website" />
+        <meta property="og:url" content="{{ base_url }}" />
+        <meta property="og:title" content="{{ title }}" />
+        <meta property="og:description" content="{{ description }}" />
+        <meta
+            property="og:image"
+            content="{{ base_url }}/path/to/og-image.jpg"
+        />
+
+        <!-- Twitter -->
+        <meta property="twitter:card" content="summary_large_image" />
+        <meta property="twitter:url" content="{{ base_url }}" />
+        <meta property="og:title" content="{{ title }}" />
+        <meta property="og:description" content="{{ description }}" />
+        <meta
+            property="twitter:image"
+            content="{{ base_url }}/path/to/twitter-image.jpg"
+        />
+
+        <!-- Other meta tags -->
+        <link rel="canonical" href="{{ base_url }}" />
+        <meta name="robots" content="index, follow" />
+        <meta name="author" content="{{ author }}" />
+
+        <link
+            href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600&display=swap"
+            rel="stylesheet"
+        />
+        <link rel="stylesheet" href="/static/css/style.css" />
+    </head>
+    <body>
+        <div class="container">
+            {% include "sidebar.html" %}
+            <main class="main-content">
+                <section class="gallery">
+                    {% for image in images %}
+                    <a
+                        href="/pottery/{{ image.slug }}"
+                        class="gallery-item-link"
+                    >
+                        <div class="gallery-item">
+                            <img
+                                src="/images/{{ image.slug }}"
+                                alt="{{ image.alt }}"
+                                loading="lazy"
+                            />
+                        </div>
+                    </a>
+                    {% endfor %}
+                </section>
+            </main>
+        </div>
+        <script src="/static/js/script.js"></script>
+    </body>
+</html>

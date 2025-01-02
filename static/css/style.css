@@ -1,0 +1,294 @@
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+/* :root {
+    --old-primary-color: #6c5ce7;
+    --primary-color: #4169e1;
+    --secondary-color: #cccfff;
+    --third-color: #00b894;
+    --accent-color: #ffeaa7;
+    --text-color: #2d3436;
+    --bg-color: #dfe6e9;
+} */
+
+:root {
+    /* New earthy color palette */
+    --clay: #9b6a6c;
+    --terracotta: #c17c74;
+    --cream: #f7e6d4;
+    --warm-gray: #574240;
+    --sand: #e2b4b0;
+
+    /* Functional assignments using existing variable names */
+    --primary-color: var(--warm-gray);
+    --secondary-color: var(--clay);
+    --text-color: var(--warm-gray);
+    --bg-color: var(--cream);
+    --accent-color: var(--sand);
+}
+
+html,
+body {
+    width: 100%;
+    overflow-x: hidden;
+}
+
+body {
+    font-family: "Poppins", sans-serif;
+    line-height: 1.6;
+    color: var(--text-color);
+    background-color: var(--bg-color);
+}
+
+.container {
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+    width: 100%;
+}
+
+.sidebar {
+    background: linear-gradient(
+        135deg,
+        var(--primary-color),
+        var(--secondary-color)
+    );
+    color: white;
+    padding: 1rem;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    width: 100%;
+}
+
+.profile-container {
+    width: 100%;
+    height: 175px;
+    overflow: hidden;
+    margin-bottom: 20px;
+    border-radius: 100px;
+}
+
+.profile-img {
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+    object-fit: cover;
+    object-position: center 33%; /* Adjust this to move the focal point of the image */
+    display: block;
+    box-shadow: 0 0 20px rgba(0, 0, 0, 0.2);
+    transform: scale(1.6);
+}
+
+.artist-name {
+    font-size: 3rem;
+    margin-bottom: 0.5rem;
+    text-align: center;
+}
+
+.artist-info {
+    text-align: center;
+    margin-bottom: 1rem;
+    font-size: 1rem;
+}
+
+.social-links {
+    display: flex;
+    justify-content: center;
+    gap: 1rem;
+}
+
+.social-links a {
+    color: var(--accent-color);
+    text-decoration: none;
+    font-size: 1.2rem;
+    font-weight: bold;
+}
+
+.main-content {
+    flex-grow: 1;
+    padding: 1rem;
+    width: 100%;
+}
+
+.gallery {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 1rem;
+    width: 100%;
+}
+
+.gallery-item-link {
+    text-decoration: none;
+    color: inherit;
+    display: block;
+}
+
+.gallery-item {
+    position: relative;
+    width: 100%;
+    padding-bottom: 150%; /* Creates a 2:3 aspect ratio */
+    overflow: hidden;
+    border-radius: 10px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    transition: transform 0.3s ease;
+}
+
+.gallery-item:hover {
+    transform: scale(1.05);
+}
+
+.gallery-item img {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+@media (min-width: 769px) {
+    body {
+        overflow: hidden; /* Prevent scrolling on the body */
+    }
+
+    .container {
+        flex-direction: row;
+        align-items: stretch;
+        height: 100vh; /* Full viewport height */
+        overflow: hidden; /* Prevent scrolling on the container */
+    }
+
+    .sidebar {
+        width: 300px;
+        height: 100vh;
+        position: sticky;
+        top: 0;
+        padding: 2rem;
+    }
+
+    .profile-img {
+        /*width: 200px;*/
+        /*height: 200px;*/
+        object-position: center 25%;
+    }
+
+    .main-content {
+        flex: 1;
+        padding: 2rem;
+        overflow-y: auto; /* Allow vertical scrolling */
+        height: 100vh; /* Full viewport height */
+    }
+
+    .gallery {
+        gap: 2rem;
+    }
+}
+
+@media (max-width: 768px) {
+    .gallery {
+        grid-template-columns: 1fr;
+    }
+}
+
+/*tattoo detail style*/
+
+.tattoo-detail {
+    position: relative;
+    padding: 20px;
+    max-width: 800px;
+    margin: 0 auto;
+}
+
+.back-link {
+    position: absolute;
+    top: 20px;
+    left: 20px;
+    color: var(--text-color);
+    text-decoration: none;
+    display: flex;
+    align-items: center;
+    font-size: 24px;
+}
+
+.back-link svg {
+    width: 24px;
+    height: 24px;
+}
+
+.tattoo-detail h2 {
+    font-size: 2rem;
+    margin: 60px 0 20px;
+    text-align: center;
+}
+
+.tattoo-image-container {
+    width: 100%;
+    max-height: 80vh;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    margin-bottom: 20px;
+}
+
+.tattoo-image {
+    max-width: 100%;
+    /* max-height: 100%; */
+    max-height: 60vh;
+    object-fit: contain;
+}
+
+.tattoo-description {
+    text-align: center;
+    margin: 20px 0;
+    font-size: 1.1rem;
+    line-height: 1.6;
+}
+
+.keywords {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 10px;
+    margin-top: 20px;
+}
+
+.keyword {
+    background-color: var(--accent-color);
+    color: var(--text-color);
+    padding: 5px 15px;
+    border-radius: 20px;
+    font-size: 0.9rem;
+}
+
+@media (max-width: 768px) {
+    .tattoo-detail {
+        padding: 15px;
+    }
+
+    .back-link {
+        top: 15px;
+        left: 15px;
+    }
+
+    .tattoo-detail h2 {
+        font-size: 1.5rem;
+        margin: 50px 0 15px;
+    }
+
+    .tattoo-image-container {
+        max-height: 60vh;
+    }
+
+    .tattoo-description {
+        font-size: 1rem;
+    }
+
+    .keyword {
+        font-size: 0.8rem;
+        padding: 4px 12px;
+    }
+}
