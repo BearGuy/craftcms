@@ -100,7 +100,9 @@ pub async fn run_server() {
     let routes = routes.recover(handle_rejection);
 
     // Start the server
-    warp::serve(routes).run(([127, 0, 0, 1], 8080)).await;
+    warp::serve(routes)
+        .run((config.server.get_ip_addr(), config.server.port))
+        .await;
 }
 
 pub fn setup_database() -> Result<(), rusqlite::Error> {

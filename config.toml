@@ -8,6 +8,10 @@ base_url = "https://www.muddyventure.fly.dev"
 detail_path = "pottery" # This will be used in URLs like /pottery/{slug}
 images_path = "images"  # This will be used in URLs like /images/{slug}
 
+[server]
+host = "127.0.0.1"
+port = 8081
+
 [meta]
 author = "Manjot Patel"
 creator_suffix = "Pottery by Manjot" # Used in titles like "{item} - Pottery by Manjot"
