@@ -1,5 +1,5 @@
 use clap::{Parser, Subcommand};
-use craftcms::{cli, database, run_server, setup_database};
+use craftcms::{cli, database, files, run_server, setup_database};
 use std::io::Read; // Add this import
 
 #[derive(Parser)]
@@ -88,6 +88,7 @@ async fn main() {
         }
         Commands::Images { command } => {
             let conn = database::init_db().expect("Failed to open database");
+            let file_manager = files::ImageFileManager::new("data/images");
             match command {
                 ImageCommands::Insert => {
                     if !atty::is(atty::Stream::Stdin) {
@@ -96,7 +97,7 @@ async fn main() {
                             .read_to_string(&mut input)
                             .expect("Failed to read from stdin");
 
-                        if let Err(e) = cli::insert_image_command(&conn, &input) {
+                        if let Err(e) = cli::handle_insert_image(&conn, &file_manager, &input) {
                             eprintln!("Error inserting image: {}", e);
                             std::process::exit(1);
                         }

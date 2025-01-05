@@ -7,13 +7,13 @@ pub struct User {
     pub access_token: Option<String>,
 }
 
-#[derive(Serialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct Image {
     pub alt: String,
     pub description: String,
     pub slug: String,
     pub keywords: Vec<String>,
-    pub image_data: Vec<u8>,
+    pub filename: String,
 }
 
 #[derive(Deserialize)]
@@ -48,6 +48,12 @@ use warp::reject::Reject;
 #[derive(Debug)]
 pub struct CustomError {
     pub message: String,
+}
+
+impl CustomError {
+    pub fn new(message: String) -> CustomError {
+        CustomError { message }
+    }
 }
 
 impl fmt::Display for CustomError {

@@ -75,7 +75,7 @@ impl Default for ServerConfig {
     }
 }
 
-#[derive(Debug, Deserialize, Clone)]
+#[derive(Default, Debug, Deserialize, Clone)]
 pub struct Config {
     pub site: SiteConfig,
     pub routes: RoutesConfig,
@@ -102,16 +102,5 @@ impl Config {
             "{}/{}/{}",
             self.site.base_url, self.routes.images_path, slug
         )
-    }
-}
-
-impl Default for Config {
-    fn default() -> Self {
-        Config {
-            site: SiteConfig::default(),
-            routes: RoutesConfig::default(),
-            server: ServerConfig::default(),
-            meta: MetaConfig::default(),
-        }
     }
 }

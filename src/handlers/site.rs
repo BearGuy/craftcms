@@ -86,19 +86,3 @@ pub async fn post_detail_handler(
 
     Ok(warp::reply::html(rendered))
 }
-
-pub async fn serve_image(
-    slug: String,
-    conn: Arc<Mutex<Connection>>,
-) -> Result<impl Reply, warp::Rejection> {
-    // Lock the connection and load the image by slug from the database
-    let conn = conn.lock().unwrap();
-    let image = crate::database::get_image_by_slug(&conn, &slug).expect("Failed to load image");
-
-    // Serve the image as a response with the correct content type
-    Ok(warp::reply::with_header(
-        image.image_data,
-        "Content-Type",
-        "image/jpeg", // Adjust the content type based on your image format
-    ))
-}

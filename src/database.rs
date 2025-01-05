@@ -22,7 +22,7 @@ pub fn run_migrations(conn: &Connection) -> Result<(), Error> {
             description TEXT,
             slug TEXT UNIQUE NOT NULL,
             keywords TEXT,
-            image_data BLOB NOT NULL,
+            file_path TEXT NOT NULL,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         );
@@ -153,10 +153,9 @@ pub fn delete_session(conn: &Connection, session_id: &str) -> Result<(), Error> 
     Ok(())
 }
 
-// Image operations
 pub fn get_images(conn: &Connection) -> Result<Vec<Image>, Error> {
     let mut stmt = conn.prepare(
-        "SELECT alt, description, slug, keywords, image_data FROM images ORDER BY created_at DESC",
+        "SELECT alt, description, slug, keywords, filename FROM images ORDER BY created_at DESC",
     )?;
     let rows = stmt.query_map(params![], |row| {
         Ok(Image {
@@ -164,41 +163,38 @@ pub fn get_images(conn: &Connection) -> Result<Vec<Image>, Error> {
             description: row.get(1)?,
             slug: row.get(2)?,
             keywords: serde_json::from_str(&row.get::<_, String>(3)?).unwrap_or_default(),
-            image_data: row.get(4)?,
+            filename: row.get(4)?,
         })
     })?;
 
-    let mut images = Vec::new();
-    for row in rows {
-        images.push(row?);
-    }
-    Ok(images)
+    rows.collect()
 }
 
 pub fn get_image_by_slug(conn: &Connection, slug: &str) -> Result<Image, Error> {
-    let mut stmt = conn.prepare(
-        "SELECT alt, description, slug, keywords, image_data FROM images WHERE slug = ?",
-    )?;
+    let mut stmt = conn
+        .prepare("SELECT alt, description, slug, keywords, filename FROM images WHERE slug = ?")?;
+
     stmt.query_row(params![slug], |row| {
         Ok(Image {
             alt: row.get(0)?,
             description: row.get(1)?,
             slug: row.get(2)?,
             keywords: serde_json::from_str(&row.get::<_, String>(3)?).unwrap_or_default(),
-            image_data: row.get(4)?,
+            filename: row.get(4)?,
         })
     })
 }
 
 pub fn insert_image(conn: &Connection, image: &Image) -> Result<(), Error> {
     conn.execute(
-        "INSERT INTO images (alt, description, slug, keywords, image_data) VALUES (?1, ?2, ?3, ?4, ?5)",
+        "INSERT INTO images (alt, description, slug, keywords, filename)
+         VALUES (?1, ?2, ?3, ?4, ?5)",
         params![
             &image.alt,
             &image.description,
             &image.slug,
             serde_json::to_string(&image.keywords).unwrap(),
-            &image.image_data,
+            &image.filename,
         ],
     )?;
     Ok(())
@@ -212,7 +208,7 @@ pub fn update_image(conn: &Connection, slug: &str, image: &Image) -> Result<(), 
             &image.description,
             &image.slug,
             serde_json::to_string(&image.keywords).unwrap(),
-            &image.image_data,
+            &image.filename,
             slug,
         ],
     )?;

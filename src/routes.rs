@@ -1,5 +1,10 @@
 use crate::config::Config;
-use crate::{handlers::*, middleware::with_auth, with_config, with_db};
+use crate::files::ImageFileManager;
+use crate::{
+    handlers::*,
+    middleware::{with_auth, with_file_manager},
+    with_config, with_db,
+};
 use rusqlite::Connection;
 use std::sync::{Arc, Mutex};
 use warp::Filter;
@@ -9,6 +14,7 @@ use crate::admin_assets::AdminAssets;
 pub fn admin_routes(
     config: Arc<Config>,
     conn: Arc<Mutex<Connection>>,
+    file_manager: Arc<ImageFileManager>,
 ) -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
     let admin_base = warp::path("admin");
 
@@ -54,6 +60,7 @@ pub fn admin_routes(
         .and(with_auth(conn.clone()))
         .and(warp::multipart::form())
         .and(with_db(conn.clone()))
+        .and(with_file_manager(file_manager.clone())) // Add this line
         .and_then(admin_create_image_handler);
 
     // Edit image page
@@ -72,6 +79,7 @@ pub fn admin_routes(
         .and(with_auth(conn.clone()))
         .and(warp::multipart::form())
         .and(with_db(conn.clone()))
+        .and(with_file_manager(file_manager.clone()))
         .and_then(admin_update_image_handler);
 
     // Delete image endpoint
@@ -80,6 +88,7 @@ pub fn admin_routes(
         .and(warp::path::param())
         .and(with_auth(conn.clone()))
         .and(with_db(conn.clone()))
+        .and(with_file_manager(file_manager.clone()))
         .and_then(admin_delete_image_handler);
 
     let admin_assets = warp::path("admin")

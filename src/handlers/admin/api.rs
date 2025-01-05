@@ -1,3 +1,5 @@
+use crate::commands;
+use crate::files::ImageFileManager;
 use crate::models::{CustomError, Image, LoginCredentials};
 use rusqlite::Connection;
 use std::sync::{Arc, Mutex};
@@ -8,134 +10,27 @@ use bytes::Buf;
 use futures::TryStreamExt;
 
 pub async fn admin_create_image_handler(
-    mut form: FormData,
+    form: FormData,
     conn: Arc<Mutex<Connection>>,
+    file_manager: Arc<ImageFileManager>,
 ) -> Result<impl Reply, warp::Rejection> {
-    let mut alt = String::new();
-    let mut description = String::new();
-    let mut slug = String::new();
-    let mut keywords = String::new();
-    let mut image_data = Vec::new();
+    let (image, image_data) = process_image_form(form).await?;
 
-    while let Ok(Some(part)) = form.try_next().await {
-        match part.name() {
-            "alt" => {
-                let bytes = part
-                    .stream()
-                    .try_fold(Vec::new(), |mut vec, data| {
-                        vec.extend_from_slice(data.chunk());
-                        async move { Ok(vec) }
-                    })
-                    .await
-                    .map_err(|e| {
-                        warp::reject::custom(CustomError {
-                            message: e.to_string(),
-                        })
-                    })?;
-                alt = String::from_utf8(bytes).map_err(|e| {
-                    warp::reject::custom(CustomError {
-                        message: e.to_string(),
-                    })
-                })?;
-            }
-            "description" => {
-                let bytes = part
-                    .stream()
-                    .try_fold(Vec::new(), |mut vec, data| {
-                        vec.extend_from_slice(data.chunk());
-                        async move { Ok(vec) }
-                    })
-                    .await
-                    .map_err(|e| {
-                        warp::reject::custom(CustomError {
-                            message: e.to_string(),
-                        })
-                    })?;
-                description = String::from_utf8(bytes).map_err(|e| {
-                    warp::reject::custom(CustomError {
-                        message: e.to_string(),
-                    })
-                })?;
-            }
-            "slug" => {
-                let bytes = part
-                    .stream()
-                    .try_fold(Vec::new(), |mut vec, data| {
-                        vec.extend_from_slice(data.chunk());
-                        async move { Ok(vec) }
-                    })
-                    .await
-                    .map_err(|e| {
-                        warp::reject::custom(CustomError {
-                            message: e.to_string(),
-                        })
-                    })?;
-                slug = String::from_utf8(bytes).map_err(|e| {
-                    warp::reject::custom(CustomError {
-                        message: e.to_string(),
-                    })
-                })?;
-            }
-            "keywords" => {
-                let bytes = part
-                    .stream()
-                    .try_fold(Vec::new(), |mut vec, data| {
-                        vec.extend_from_slice(data.chunk());
-                        async move { Ok(vec) }
-                    })
-                    .await
-                    .map_err(|e| {
-                        warp::reject::custom(CustomError {
-                            message: e.to_string(),
-                        })
-                    })?;
-                keywords = String::from_utf8(bytes).map_err(|e| {
-                    warp::reject::custom(CustomError {
-                        message: e.to_string(),
-                    })
-                })?;
-            }
-            "image" => {
-                image_data = part
-                    .stream()
-                    .try_fold(Vec::new(), |mut vec, data| {
-                        vec.extend_from_slice(data.chunk());
-                        async move { Ok(vec) }
-                    })
-                    .await
-                    .map_err(|e| {
-                        warp::reject::custom(CustomError {
-                            message: e.to_string(),
-                        })
-                    })?;
-            }
-            _ => (),
-        }
-    }
+    let (data, mime_type) = image_data.ok_or_else(|| {
+        println!("No image data provided in form");
+        warp::reject::custom(CustomError::new("No image data provided".to_string()))
+    })?;
 
-    // Validate the image data
-    if image_data.is_empty() {
-        return Err(warp::reject::custom(CustomError {
-            message: "No image data provided".to_string(),
-        }));
-    }
+    let conn_guard = conn.lock().map_err(|e| {
+        println!("Failed to acquire database lock: {}", e);
+        CustomError::new(e.to_string())
+    })?;
 
-    if image_data.len() > 5_000_000 {
-        return Err(warp::reject::custom(CustomError {
-            message: "File too large".to_string(),
-        }));
-    }
-
-    let image = Image {
-        alt,
-        description,
-        slug,
-        keywords: keywords.split(',').map(|s| s.trim().to_string()).collect(),
-        image_data,
-    };
-
-    let conn = conn.lock().unwrap();
-    crate::database::insert_image(&conn, &image).expect("Failed to insert image");
+    commands::insert_image(&conn_guard, &file_manager, &data, &mime_type, image).map_err(|e| {
+        println!("Error in insert_image command: {}", e);
+        warp::reject::custom(CustomError::new(e.to_string()))
+    })?;
+    println!("Image inserted successfully");
 
     Ok(warp::reply::with_status(
         "Image created successfully!",
@@ -145,148 +40,21 @@ pub async fn admin_create_image_handler(
 
 pub async fn admin_update_image_handler(
     slug: String,
-    mut form: FormData,
+    form: FormData,
     conn: Arc<Mutex<Connection>>,
+    file_manager: Arc<ImageFileManager>,
 ) -> Result<impl Reply, warp::Rejection> {
-    let mut alt = String::new();
-    let mut description = String::new();
-    let mut new_slug = String::new();
-    let mut keywords = String::new();
-    let mut image_data: Option<Vec<u8>> = None;
+    let (image, image_data) = process_image_form(form).await?;
 
-    while let Ok(Some(part)) = form.try_next().await {
-        match part.name() {
-            "alt" => {
-                let bytes = part
-                    .stream()
-                    .try_fold(Vec::new(), |mut vec, data| {
-                        vec.extend_from_slice(data.chunk());
-                        async move { Ok(vec) }
-                    })
-                    .await
-                    .map_err(|e| {
-                        warp::reject::custom(CustomError {
-                            message: e.to_string(),
-                        })
-                    })?;
-                alt = String::from_utf8(bytes).map_err(|e| {
-                    warp::reject::custom(CustomError {
-                        message: e.to_string(),
-                    })
-                })?;
-            }
-            "description" => {
-                let bytes = part
-                    .stream()
-                    .try_fold(Vec::new(), |mut vec, data| {
-                        vec.extend_from_slice(data.chunk());
-                        async move { Ok(vec) }
-                    })
-                    .await
-                    .map_err(|e| {
-                        warp::reject::custom(CustomError {
-                            message: e.to_string(),
-                        })
-                    })?;
-                description = String::from_utf8(bytes).map_err(|e| {
-                    warp::reject::custom(CustomError {
-                        message: e.to_string(),
-                    })
-                })?;
-            }
-            "slug" => {
-                let bytes = part
-                    .stream()
-                    .try_fold(Vec::new(), |mut vec, data| {
-                        vec.extend_from_slice(data.chunk());
-                        async move { Ok(vec) }
-                    })
-                    .await
-                    .map_err(|e| {
-                        warp::reject::custom(CustomError {
-                            message: e.to_string(),
-                        })
-                    })?;
-                new_slug = String::from_utf8(bytes).map_err(|e| {
-                    warp::reject::custom(CustomError {
-                        message: e.to_string(),
-                    })
-                })?;
-            }
-            "keywords" => {
-                let bytes = part
-                    .stream()
-                    .try_fold(Vec::new(), |mut vec, data| {
-                        vec.extend_from_slice(data.chunk());
-                        async move { Ok(vec) }
-                    })
-                    .await
-                    .map_err(|e| {
-                        warp::reject::custom(CustomError {
-                            message: e.to_string(),
-                        })
-                    })?;
-                keywords = String::from_utf8(bytes).map_err(|e| {
-                    warp::reject::custom(CustomError {
-                        message: e.to_string(),
-                    })
-                })?;
-            }
-            "image" => {
-                let bytes = part
-                    .stream()
-                    .try_fold(Vec::new(), |mut vec, data| {
-                        vec.extend_from_slice(data.chunk());
-                        async move { Ok(vec) }
-                    })
-                    .await
-                    .map_err(|e| {
-                        warp::reject::custom(CustomError {
-                            message: e.to_string(),
-                        })
-                    })?;
-
-                // Only set image_data if we actually received file data
-                if !bytes.is_empty() {
-                    if bytes.len() > 5_000_000 {
-                        return Err(warp::reject::custom(CustomError {
-                            message: "File too large".to_string(),
-                        }));
-                    }
-                    image_data = Some(bytes);
-                }
-            }
-            _ => (),
-        }
-    }
-
-    let conn_guard = conn.lock().map_err(|e| {
-        eprintln!("Failed to lock mutex: {:?}", e);
+    let conn_guard = conn.lock().map_err(|_| {
         warp::reject::custom(CustomError {
             message: "Internal server error".to_string(),
         })
     })?;
 
-    // Get the existing image to preserve image_data if no new image was uploaded
-    let existing_image = crate::database::get_image_by_slug(&conn_guard, &slug).map_err(|e| {
-        eprintln!("Failed to get existing image: {:?}", e);
+    commands::update_image(&conn_guard, &file_manager, &slug, image_data, image).map_err(|e| {
         warp::reject::custom(CustomError {
-            message: "Image not found".to_string(),
-        })
-    })?;
-
-    let updated_image = Image {
-        alt,
-        description,
-        slug: new_slug,
-        keywords: keywords.split(',').map(|s| s.trim().to_string()).collect(),
-        image_data: image_data.unwrap_or(existing_image.image_data),
-    };
-
-    crate::database::update_image(&conn_guard, &slug, &updated_image).map_err(|e| {
-        eprintln!("Failed to update image: {:?}", e);
-        warp::reject::custom(CustomError {
-            message: "Failed to update image".to_string(),
+            message: format!("Failed to update image: {}", e),
         })
     })?;
 
@@ -299,12 +67,17 @@ pub async fn admin_update_image_handler(
 pub async fn admin_delete_image_handler(
     slug: String,
     conn: Arc<Mutex<Connection>>,
+    file_manager: Arc<ImageFileManager>,
 ) -> Result<impl Reply, warp::Rejection> {
-    let conn = conn.lock().unwrap();
-    crate::database::delete_image(&conn, &slug).map_err(|e| {
-        eprintln!("Failed to delete image: {:?}", e);
+    let conn_guard = conn.lock().map_err(|_| {
         warp::reject::custom(CustomError {
-            message: "Failed to delete image".to_string(),
+            message: "Internal server error".to_string(),
+        })
+    })?;
+
+    commands::delete_image(&conn_guard, &file_manager, &slug).map_err(|e| {
+        warp::reject::custom(CustomError {
+            message: format!("Failed to delete image: {}", e),
         })
     })?;
 
@@ -394,5 +167,175 @@ pub async fn admin_logout_handler(
         warp::reply::with_status("Logged out successfully", warp::http::StatusCode::OK),
         "Set-Cookie",
         cookie,
+    ))
+}
+
+async fn process_image_form(
+    mut form: FormData,
+) -> Result<(Image, Option<(Vec<u8>, mime::Mime)>), warp::Rejection> {
+    println!("Starting to process image form");
+
+    let mut alt = String::new();
+    let mut description = String::new();
+    let mut slug = String::new();
+    let mut keywords_str = String::new();
+    let mut image_data = None;
+
+    while let Ok(Some(part)) = form.try_next().await {
+        println!("Processing form part: {}", part.name());
+
+        let mime_type = if part.name() == "image" {
+            let content_type = part.content_type();
+            println!("Image content type from form: {:?}", content_type);
+
+            content_type
+                .map(|ct| {
+                    let parsed = ct
+                        .parse::<mime::Mime>()
+                        .unwrap_or(mime::APPLICATION_OCTET_STREAM);
+                    println!("Parsed mime type: {:?}", parsed);
+                    parsed
+                })
+                .unwrap_or_else(|| {
+                    println!("No content type provided, using default");
+                    mime::APPLICATION_OCTET_STREAM
+                })
+        } else {
+            mime::APPLICATION_OCTET_STREAM
+        };
+
+        match part.name() {
+            "alt" => {
+                let bytes = part
+                    .stream()
+                    .try_fold(Vec::new(), |mut vec, data| {
+                        vec.extend_from_slice(data.chunk());
+                        async move { Ok(vec) }
+                    })
+                    .await
+                    .map_err(|e| {
+                        warp::reject::custom(CustomError {
+                            message: e.to_string(),
+                        })
+                    })?;
+                alt = String::from_utf8(bytes).map_err(|e| {
+                    warp::reject::custom(CustomError {
+                        message: e.to_string(),
+                    })
+                })?;
+            }
+            "description" => {
+                let bytes = part
+                    .stream()
+                    .try_fold(Vec::new(), |mut vec, data| {
+                        vec.extend_from_slice(data.chunk());
+                        async move { Ok(vec) }
+                    })
+                    .await
+                    .map_err(|e| {
+                        warp::reject::custom(CustomError {
+                            message: e.to_string(),
+                        })
+                    })?;
+                description = String::from_utf8(bytes).map_err(|e| {
+                    warp::reject::custom(CustomError {
+                        message: e.to_string(),
+                    })
+                })?;
+            }
+            "slug" => {
+                let bytes = part
+                    .stream()
+                    .try_fold(Vec::new(), |mut vec, data| {
+                        vec.extend_from_slice(data.chunk());
+                        async move { Ok(vec) }
+                    })
+                    .await
+                    .map_err(|e| {
+                        warp::reject::custom(CustomError {
+                            message: e.to_string(),
+                        })
+                    })?;
+                slug = String::from_utf8(bytes).map_err(|e| {
+                    warp::reject::custom(CustomError {
+                        message: e.to_string(),
+                    })
+                })?;
+            }
+            "keywords" => {
+                let bytes = part
+                    .stream()
+                    .try_fold(Vec::new(), |mut vec, data| {
+                        vec.extend_from_slice(data.chunk());
+                        async move { Ok(vec) }
+                    })
+                    .await
+                    .map_err(|e| {
+                        warp::reject::custom(CustomError {
+                            message: e.to_string(),
+                        })
+                    })?;
+                keywords_str = String::from_utf8(bytes).map_err(|e| {
+                    warp::reject::custom(CustomError {
+                        message: e.to_string(),
+                    })
+                })?;
+            }
+            "image" => {
+                let bytes = part
+                    .stream()
+                    .try_fold(Vec::new(), |mut vec, data| {
+                        vec.extend_from_slice(data.chunk());
+                        async move { Ok(vec) }
+                    })
+                    .await
+                    .map_err(|e| {
+                        println!("Error reading image data: {:?}", e);
+                        warp::reject::custom(CustomError {
+                            message: e.to_string(),
+                        })
+                    })?;
+
+                println!("Received image data: {} bytes", bytes.len());
+
+                if !bytes.is_empty() && bytes.len() > 10_000_000 {
+                    println!("File too large: {} bytes", bytes.len());
+                    return Err(warp::reject::custom(CustomError::new(
+                        "File too large".to_string(),
+                    )));
+                }
+
+                println!(
+                    "Successfully stored image data with mime type: {:?}",
+                    mime_type
+                );
+                image_data = Some((bytes, mime_type));
+            }
+            _ => (),
+        }
+    }
+
+    if alt.is_empty() || slug.is_empty() {
+        return Err(warp::reject::custom(CustomError::new(
+            "Missing required fields".to_string(),
+        )));
+    }
+
+    // Convert keywords string to Vec<String>
+    let keywords = keywords_str
+        .split(',')
+        .filter(|s| !s.trim().is_empty())
+        .map(|s| s.trim().to_string())
+        .collect();
+
+    Ok((
+        Image {
+            alt,
+            description,
+            slug,
+            keywords,
+            filename: String::new(), // Will be set by command
+        },
+        image_data,
     ))
 }

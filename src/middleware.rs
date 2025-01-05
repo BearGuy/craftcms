@@ -1,3 +1,4 @@
+use crate::files::ImageFileManager;
 use crate::{CustomError, RedirectToLogin};
 use rusqlite::Connection;
 use std::sync::{Arc, Mutex};
@@ -36,4 +37,10 @@ pub fn with_auth(
             },
         )
         .untuple_one()
+}
+
+pub fn with_file_manager(
+    file_manager: Arc<ImageFileManager>,
+) -> impl Filter<Extract = (Arc<ImageFileManager>,), Error = std::convert::Infallible> + Clone {
+    warp::any().map(move || file_manager.clone())
 }

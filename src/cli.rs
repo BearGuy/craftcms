@@ -1,9 +1,8 @@
+use crate::files::ImageFileManager;
 use crate::models::{Image, ImageInput};
 use rusqlite::Connection;
 use serde_json;
-use std::fs;
 use std::io::{self, Write};
-use std::path::Path;
 
 pub fn create_user_command(conn: &Connection) -> Result<(), Box<dyn std::error::Error>> {
     print!("Enter email: ");
@@ -63,31 +62,20 @@ pub fn delete_user_command(
     Ok(())
 }
 
-pub fn insert_image_command(
+pub fn handle_insert_image(
     conn: &Connection,
+    file_manager: &ImageFileManager,
     json_str: &str,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    // Parse the JSON input
     let input: ImageInput = serde_json::from_str(json_str)?;
-
-    // Read the image file
-    let image_path = Path::new(&input.url);
-    let image_data = fs::read(image_path)?;
-
-    // Create the Image struct
     let image = Image {
         alt: input.alt,
         description: input.description,
         slug: input.slug,
         keywords: input.keywords,
-        image_data,
+        filename: String::new(), // Will be set during save
     };
 
-    // Insert the image into the database
-    match crate::database::insert_image(conn, &image) {
-        Ok(_) => println!("Image inserted successfully!"),
-        Err(e) => println!("Error inserting image: {}", e),
-    }
-
-    Ok(())
+    // Use insert_image_from_path since we have a file path in input.url
+    crate::commands::insert_image_from_path(conn, file_manager, &input.url, image)
 }

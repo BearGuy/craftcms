@@ -1,7 +1,9 @@
 pub mod admin_assets;
 pub mod cli;
+pub mod commands;
 pub mod config;
 pub mod database;
+pub mod files;
 pub mod handlers;
 pub mod middleware;
 pub mod models;
@@ -9,6 +11,7 @@ pub mod routes;
 pub mod template_utils;
 pub mod templates;
 
+use files::ImageFileManager;
 use models::{CustomError, RedirectToLogin};
 use rusqlite::Connection;
 use std::sync::{Arc, Mutex};
@@ -30,6 +33,8 @@ fn with_config(
 pub async fn handle_rejection(
     err: warp::Rejection,
 ) -> Result<impl warp::Reply, std::convert::Infallible> {
+    println!("=== Handling Rejection ===");
+    println!("Rejection: {:?}", err); // Log the full rejection
     if err.is_not_found() {
         let response = Response::builder()
             .status(StatusCode::NOT_FOUND)
@@ -47,6 +52,13 @@ pub async fn handle_rejection(
         let response = Response::builder()
             .status(StatusCode::UNAUTHORIZED)
             .body(e.message.clone())
+            .unwrap();
+        Ok(response)
+    } else if let Some(_) = err.find::<warp::reject::PayloadTooLarge>() {
+        println!("Payload too large");
+        let response = Response::builder()
+            .status(StatusCode::BAD_REQUEST)
+            .body("File too large. Maximum size is 5MB.".to_string())
             .unwrap();
         Ok(response)
     } else {
@@ -67,6 +79,9 @@ pub async fn run_server() {
         database::init_db().expect("Failed to initialize database"),
     ));
 
+    // Initialize file manager
+    let file_manager = Arc::new(ImageFileManager::new("data/images"));
+
     // Define routes
     let home_route = warp::path::end()
         .and(warp::get())
@@ -81,19 +96,16 @@ pub async fn run_server() {
         .and(with_db(conn.clone()))
         .and_then(handlers::post_detail_handler);
 
-    let image_route = warp::path!("images" / String).and(warp::get()).and_then({
-        let conn = Arc::clone(&conn);
-        move |slug| handlers::serve_image(slug, conn.clone())
-    });
-
     // Admin routes from routes module
-    let admin_routes = routes::admin_routes(config.clone(), conn.clone());
+    let admin_routes = routes::admin_routes(config.clone(), conn.clone(), file_manager.clone());
+
+    let image_routes = warp::path("images").and(warp::fs::dir("data/images"));
 
     let static_files = warp::path("static").and(warp::fs::dir("static"));
 
     let routes = home_route
         .or(post_detail_route)
-        .or(image_route)
+        .or(image_routes)
         .or(admin_routes)
         .or(static_files);
 

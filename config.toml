@@ -10,7 +10,7 @@ images_path = "images"  # This will be used in URLs like /images/{slug}
 
 [server]
 host = "127.0.0.1"
-port = 8081
+port = 8080
 
 [meta]
 author = "Manjot Patel"
