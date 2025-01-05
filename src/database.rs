@@ -22,7 +22,7 @@ pub fn run_migrations(conn: &Connection) -> Result<(), Error> {
             description TEXT,
             slug TEXT UNIQUE NOT NULL,
             keywords TEXT,
-            file_path TEXT NOT NULL,
+            filename TEXT NOT NULL,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         );

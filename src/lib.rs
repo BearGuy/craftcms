@@ -33,8 +33,6 @@ fn with_config(
 pub async fn handle_rejection(
     err: warp::Rejection,
 ) -> Result<impl warp::Reply, std::convert::Infallible> {
-    println!("=== Handling Rejection ===");
-    println!("Rejection: {:?}", err); // Log the full rejection
     if err.is_not_found() {
         let response = Response::builder()
             .status(StatusCode::NOT_FOUND)
