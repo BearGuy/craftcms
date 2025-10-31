@@ -1,0 +1,97 @@
+name: Build and Release
+
+on:
+  push:
+    branches:
+      - main
+    tags:
+      - "v*"
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  build:
+    name: Build ${{ matrix.system }}
+    strategy:
+      matrix:
+        include:
+          - system: x86_64-linux
+            runner: ubuntu-latest
+          - system: aarch64-darwin
+            runner: macos-14
+    runs-on: ${{ matrix.runner }}
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Nix
+        uses: DeterminateSystems/nix-installer-action@v12
+
+      - name: Configure Nix cache
+        uses: DeterminateSystems/magic-nix-cache-action@v7
+
+      - name: Build ${{ matrix.system }}
+        run: nix build .#packages.${{ matrix.system }}.craftcms
+
+      - name: Collect artifacts
+        shell: bash
+        run: |
+          set -euo pipefail
+          out_path="$(nix path-info .#packages.${{ matrix.system }}.craftcms)"
+          mkdir -p dist
+          cp "${out_path}/bin/craftcms" "dist/craftcms-${{ matrix.system }}"
+          chmod 755 "dist/craftcms-${{ matrix.system }}"
+          (cd dist && shasum -a 256 "craftcms-${{ matrix.system }}" > "craftcms-${{ matrix.system }}.sha256")
+          tar -C "${out_path}/bin" -czf "dist/craftcms-${{ matrix.system }}.tar.gz" craftcms
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: craftcms-${{ matrix.system }}
+          path: dist/
+          if-no-files-found: error
+
+  release:
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install Nix
+        uses: DeterminateSystems/nix-installer-action@v12
+
+      - name: Configure Nix cache
+        uses: DeterminateSystems/magic-nix-cache-action@v7
+
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Publish to FlakeHub
+        uses: DeterminateSystems/flakehub-push@v1
+        with:
+          visibility: public
+          name: BearGuy/craftcms
+          tag: ${{ github.ref_name }}
+          include-output-paths: true
+
+      - name: Prepare release assets
+        run: |
+          mkdir -p release
+          find artifacts -maxdepth 2 -type f -exec cp {} release/ \;
+
+      - name: Create GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: release/*
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
