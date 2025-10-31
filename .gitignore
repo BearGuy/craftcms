@@ -52,3 +52,6 @@ logs/
 # Release builds
 /release/
 /dist/
+
+# Nix outputs
+/result
