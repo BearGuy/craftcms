@@ -46,7 +46,6 @@ jobs:
           cp target/x86_64-unknown-linux-musl/release/craftcms dist/craftcms
           chmod 755 dist/craftcms
           (cd dist && shasum -a 256 craftcms > craftcms.sha256)
-          tar -C dist -czf dist/craftcms.tar.gz craftcms
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
@@ -90,6 +89,30 @@ jobs:
         run: |
           mkdir -p release
           find artifacts -maxdepth 2 -type f -exec cp {} release/ \;
+
+      - name: Remove stale labeled release assets
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          api="https://api.github.com/repos/${GITHUB_REPOSITORY}"
+          release_id="$(curl -fsSL \
+            -H "Authorization: Bearer ${GITHUB_TOKEN}" \
+            -H "Accept: application/vnd.github+json" \
+            "${api}/releases/tags/${GITHUB_REF_NAME}" \
+            | jq -r '.id')"
+
+          curl -fsSL \
+            -H "Authorization: Bearer ${GITHUB_TOKEN}" \
+            -H "Accept: application/vnd.github+json" \
+            "${api}/releases/${release_id}/assets?per_page=100" \
+            | jq -r '.[] | select((.name | test("^craftcms-[^-]+-linux")) or (.name == "craftcms.tar.gz")) | .id' \
+            | while read -r asset_id; do
+                curl -fsS -X DELETE \
+                  -H "Authorization: Bearer ${GITHUB_TOKEN}" \
+                  -H "Accept: application/vnd.github+json" \
+                  "${api}/releases/assets/${asset_id}"
+              done
 
       - name: Create GitHub release
         uses: softprops/action-gh-release@v2
