@@ -12,21 +12,12 @@ on:
 
 jobs:
   build:
-    name: Build release assets
+    name: Build release binary
     runs-on: ubuntu-latest
     permissions:
-      contents: read
+      contents: write
     steps:
-      - uses: actions/checkout@v4
-
-      - name: Install Nix
-        uses: DeterminateSystems/nix-installer-action@v12
-
-      - name: Configure Nix cache
-        uses: DeterminateSystems/magic-nix-cache-action@v7
-
-      - name: Build Nix package
-        run: nix build .#packages.x86_64-linux.craftcms
+      - uses: actions/checkout@v6
 
       - name: Build portable Linux binary
         run: |
@@ -38,6 +29,9 @@ jobs:
             AR_x86_64_unknown_linux_musl=ar \
             cargo build --release --target x86_64-unknown-linux-musl
 
+      - name: Run tests
+        run: cargo test
+
       - name: Collect release assets
         shell: bash
         run: |
@@ -47,61 +41,28 @@ jobs:
           chmod 755 dist/craftcms
           (cd dist && shasum -a 256 craftcms > craftcms.sha256)
 
-      - name: Upload artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: craftcms
-          path: dist/
-          if-no-files-found: error
-
-  release:
-    needs: build
-    if: startsWith(github.ref, 'refs/tags/')
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-      id-token: write
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Install Nix
-        uses: DeterminateSystems/nix-installer-action@v12
-
-      - name: Configure Nix cache
-        uses: DeterminateSystems/magic-nix-cache-action@v7
-
-      - name: Download build artifacts
-        uses: actions/download-artifact@v4
-        with:
-          path: artifacts
-
-      - name: Publish to FlakeHub
-        uses: DeterminateSystems/flakehub-push@v1
-        with:
-          visibility: public
-          name: BearGuy/craftcms
-          tag: ${{ github.ref_name }}
-          include-output-paths: true
-
-      - name: Prepare release assets
-        run: |
-          mkdir -p release
-          find artifacts -maxdepth 2 -type f -exec cp {} release/ \;
-
-      - name: Remove stale labeled release assets
+      - name: Remove stale release assets
+        if: startsWith(github.ref, 'refs/tags/')
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
           api="https://api.github.com/repos/${GITHUB_REPOSITORY}"
-          release_id="$(curl -fsSL \
+          status="$(curl -sS -o /tmp/release.json -w "%{http_code}" \
             -H "Authorization: Bearer ${GITHUB_TOKEN}" \
             -H "Accept: application/vnd.github+json" \
-            "${api}/releases/tags/${GITHUB_REF_NAME}" \
-            | jq -r '.id')"
+            "${api}/releases/tags/${GITHUB_REF_NAME}")"
 
+          if [ "${status}" = "404" ]; then
+            exit 0
+          fi
+
+          if [ "${status}" != "200" ]; then
+            cat /tmp/release.json
+            exit 1
+          fi
+
+          release_id="$(jq -r '.id' /tmp/release.json)"
           curl -fsSL \
             -H "Authorization: Bearer ${GITHUB_TOKEN}" \
             -H "Accept: application/vnd.github+json" \
@@ -115,8 +76,9 @@ jobs:
               done
 
       - name: Create GitHub release
-        uses: softprops/action-gh-release@v2
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2.4.1
         with:
-          files: release/*
+          files: dist/*
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
