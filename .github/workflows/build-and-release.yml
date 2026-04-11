@@ -76,6 +76,20 @@ jobs:
         with:
           path: artifacts
 
+      - name: Build portable Linux release binary
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y musl-tools pkg-config libsqlite3-dev binutils
+          rustup target add x86_64-unknown-linux-musl
+          CC_x86_64_unknown_linux_musl=musl-gcc \
+            AR_x86_64_unknown_linux_musl=ar \
+            cargo build --release --target x86_64-unknown-linux-musl
+          mkdir -p release
+          cp target/x86_64-unknown-linux-musl/release/craftcms release/craftcms
+          chmod 755 release/craftcms
+          (cd release && shasum -a 256 craftcms > craftcms.sha256)
+
       - name: Publish to FlakeHub
         uses: DeterminateSystems/flakehub-push@v1
         with:

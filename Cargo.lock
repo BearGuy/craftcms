@@ -273,7 +273,7 @@ dependencies = [
 
 [[package]]
 name = "craftcms"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "argon2",
  "atty",

@@ -298,7 +298,12 @@ async fn process_image_form(
 
                 println!("Received image data: {} bytes", bytes.len());
 
-                if !bytes.is_empty() && bytes.len() > 10_000_000 {
+                if bytes.is_empty() {
+                    println!("Ignoring empty image upload");
+                    continue;
+                }
+
+                if bytes.len() > 10_000_000 {
                     println!("File too large: {} bytes", bytes.len());
                     return Err(warp::reject::custom(CustomError::new(
                         "File too large".to_string(),

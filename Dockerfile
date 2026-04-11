@@ -5,10 +5,14 @@ RUN apt-get update && apt-get install -y \
     pkg-config \
     libsqlite3-dev \
     musl-tools \
+    binutils \
     && rm -rf /var/lib/apt/lists/*
 
 # Add musl target
 RUN rustup target add x86_64-unknown-linux-musl
+
+ENV CC_x86_64_unknown_linux_musl=musl-gcc
+ENV AR_x86_64_unknown_linux_musl=ar
 
 # Create a new empty shell project
 WORKDIR /usr/src/craftcms

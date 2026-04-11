@@ -202,7 +202,7 @@ pub fn insert_image(conn: &Connection, image: &Image) -> Result<(), Error> {
 
 pub fn update_image(conn: &Connection, slug: &str, image: &Image) -> Result<(), Error> {
     conn.execute(
-        "UPDATE images SET alt = ?1, description = ?2, slug = ?3, keywords = ?4, image_data = ?5 WHERE slug = ?6",
+        "UPDATE images SET alt = ?1, description = ?2, slug = ?3, keywords = ?4, filename = ?5 WHERE slug = ?6",
         params![
             &image.alt,
             &image.description,
@@ -218,4 +218,33 @@ pub fn update_image(conn: &Connection, slug: &str, image: &Image) -> Result<(), 
 pub fn delete_image(conn: &Connection, slug: &str) -> Result<(), Error> {
     conn.execute("DELETE FROM images WHERE slug = ?", params![slug])?;
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn image(slug: &str, filename: &str) -> Image {
+        Image {
+            alt: "Alt text".to_string(),
+            description: "Description".to_string(),
+            slug: slug.to_string(),
+            keywords: vec!["one".to_string(), "two".to_string()],
+            filename: filename.to_string(),
+        }
+    }
+
+    #[test]
+    fn update_image_updates_filename_column() {
+        let conn = Connection::open_in_memory().unwrap();
+        run_migrations(&conn).unwrap();
+
+        insert_image(&conn, &image("old-slug", "old-slug.jpg")).unwrap();
+
+        let updated = image("new-slug", "new-slug.png");
+        update_image(&conn, "old-slug", &updated).unwrap();
+
+        let saved = get_image_by_slug(&conn, "new-slug").unwrap();
+        assert_eq!(saved.filename, "new-slug.png");
+    }
 }
