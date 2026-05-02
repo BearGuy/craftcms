@@ -1,15 +1,12 @@
 [package]
 name = "craftcms"
-version = "0.2.1"
+version = "0.2.3"
 edition = "2021"
 authors = ["Stephen Peterkins <stephen@peterkins.dev>"]
 description = "A simple CMS for managing and serving templated HTML documents."
 license = "MIT"
 repository = "https://github.com/bearguy/craftcms"
 readme = "README.md"
-
-[build]
-rustflags = ["-C", "target-feature=+crt-static"]
 
 [dependencies]
 tokio = { version = "1", features = ["full"] }
@@ -33,3 +30,4 @@ lazy_static = "1.5.0"
 atty = "0.2.14"
 mime = "0.3.17"
 mime_guess = "2.0.5"
+reqwest = { version = "0.12.24", default-features = false, features = ["json", "rustls-tls"] }

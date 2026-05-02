@@ -6,33 +6,82 @@
         <title>Admin - {{ site_name }}</title>
         <link rel="stylesheet" href="/admin/assets/css/admin.css" />
     </head>
-    <body>
-        <header>
-            <h1>{{ site_name }} Admin</h1>
-            <nav>
-                <a href="/admin/new" class="add-new-button">Add New Image</a>
-                <a href="/" class="view-site-button">View Site</a>
-                <button onclick="logout()" class="logout-button">Logout</button>
-            </nav>
-        </header>
+    <body class="admin-body">
+        <div class="admin-shell">
+            <aside class="admin-sidebar">
+                <div class="admin-brand">
+                    <span class="admin-brand-label">CraftCMS</span>
+                    <h1>{{ site_name }}</h1>
+                    <p>Admin</p>
+                </div>
 
-        <main>
-            <h2>Image Gallery Management</h2>
+                <nav class="admin-nav">
+                    <a href="/admin" class="admin-nav-link active">Gallery</a>
+                    <a href="/admin/settings" class="admin-nav-link">Settings</a>
+                    <a href="/" class="admin-nav-link">View Site</a>
+                </nav>
+
+                <button onclick="logout()" class="admin-logout">Logout</button>
+            </aside>
+
+            <main class="admin-main">
+                <header class="admin-topbar">
+                    <div>
+                        <p class="eyebrow">Content</p>
+                        <h2>Image Gallery</h2>
+                    </div>
+                    <a href="/admin/new" class="button button-primary">Add New Image</a>
+                </header>
+
+                <div class="filter-tabs">
+                <a
+                    href="/admin?filter=all"
+                    class="filter-tab {% if active_filter == 'all' %}active{% endif %}"
+                    >All</a
+                >
+                <a
+                    href="/admin?filter=published"
+                    class="filter-tab {% if active_filter == 'published' %}active{% endif %}"
+                    >Published</a
+                >
+                <a
+                    href="/admin?filter=draft"
+                    class="filter-tab {% if active_filter == 'draft' %}active{% endif %}"
+                    >Draft</a
+                >
+                <a
+                    href="/admin?filter=deleted"
+                    class="filter-tab {% if active_filter == 'deleted' %}active{% endif %}"
+                    >Deleted</a
+                >
+            </div>
 
             {% if images | length == 0 %}
-            <div class="empty-state">
+            <div class="empty-state admin-empty-state">
                 <p>No images yet. Start by adding your first image!</p>
             </div>
             {% else %}
             <div class="admin-gallery">
                 {% for image in images %}
-                <div class="admin-gallery-item">
+                <div class="admin-gallery-item" data-slug="{{ image.slug }}">
                     <img
                         src="/images/{{ image.filename}}"
                         alt="{{ image.alt }}"
                         loading="lazy"
                     />
-                    <h3>{{ image.alt }}</h3>
+                    <div class="card-header">
+                        <h3>{{ image.alt }}</h3>
+                    </div>
+
+                    <div class="status-row">
+                        <span class="status-badge status-{{ image.status }}"
+                            >{{ image.status }}</span
+                        >
+                        <span class="source-badge">{{ image.source }}</span>
+                        {% if image.deleted_at %}
+                        <span class="status-badge status-deleted">deleted</span>
+                        {% endif %}
+                    </div>
 
                     <div class="metadata">
                         <div class="slug">{{ image.slug }}</div>
@@ -45,16 +94,13 @@
                         </div>
                         {% else %}
                         <div class="keywords">
-                            <span
-                                class="keyword"
-                                style="background-color: var(--secondary-color)"
-                                >No keywords</span
-                            >
+                            <span class="keyword keyword-muted">No keywords</span>
                         </div>
                         {% endif %}
                     </div>
 
                     <div class="admin-controls">
+                        {% if not image.deleted_at %}
                         <a
                             href="/admin/edit/{{ image.slug }}"
                             class="edit-button"
@@ -74,16 +120,46 @@
                                 Delete
                             </button>
                         </form>
+                        {% else %}
+                        <button
+                            class="restore-button"
+                            data-slug="{{ image.slug }}"
+                            type="button"
+                        >
+                            Restore
+                        </button>
+                        {% endif %}
                     </div>
+
+                    {% if not image.deleted_at %}
+                    <div class="status-actions">
+                        {% if image.status == "published" %}
+                        <button
+                            type="button"
+                            class="draft-button"
+                            data-slug="{{ image.slug }}"
+                            data-status="draft"
+                        >
+                            Move to Draft
+                        </button>
+                        {% else %}
+                        <button
+                            type="button"
+                            class="publish-button"
+                            data-slug="{{ image.slug }}"
+                            data-status="published"
+                        >
+                            Publish
+                        </button>
+                        {% endif %}
+                    </div>
+                    {% endif %}
                 </div>
                 {% endfor %}
             </div>
             {% endif %}
-        </main>
-
-        <footer>
-            <p>&copy; {{ site_name }} - Admin Dashboard</p>
-        </footer>
+            </main>
+        </div>
 
         <script src="/admin/assets/js/admin.js"></script>
     </body>

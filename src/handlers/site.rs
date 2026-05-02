@@ -59,7 +59,7 @@ pub async fn post_detail_handler(
         })
     })?;
 
-    let image = crate::database::get_image_by_slug(&conn_guard, &slug).map_err(|e| {
+    let image = crate::database::get_site_image_by_slug(&conn_guard, &slug).map_err(|e| {
         eprintln!("Failed to get image: {:?}", e);
         warp::reject::custom(CustomError {
             message: "Image not found".to_string(),

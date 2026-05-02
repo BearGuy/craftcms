@@ -1,0 +1,150 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>Settings - {{ site_name }}</title>
+        <link rel="stylesheet" href="/admin/assets/css/admin.css" />
+    </head>
+    <body class="admin-body">
+        <div class="admin-shell">
+            <aside class="admin-sidebar">
+                <div class="admin-brand">
+                    <span class="admin-brand-label">CraftCMS</span>
+                    <h1>{{ site_name }}</h1>
+                    <p>Admin</p>
+                </div>
+
+                <nav class="admin-nav">
+                    <a href="/admin" class="admin-nav-link">Gallery</a>
+                    <a href="/admin/settings" class="admin-nav-link active">Settings</a>
+                    <a href="/" class="admin-nav-link">View Site</a>
+                </nav>
+
+                <button onclick="logout()" class="admin-logout">Logout</button>
+            </aside>
+
+            <main class="admin-main">
+                <header class="admin-topbar">
+                    <div>
+                        <p class="eyebrow">Workspace</p>
+                        <h2>Settings</h2>
+                    </div>
+                </header>
+
+                <section class="admin-panel">
+                    <div class="section-heading">
+                        <div>
+                            <p class="eyebrow">Defaults</p>
+                            <h3>Imports</h3>
+                        </div>
+                    </div>
+
+                    <form action="/admin/settings/update" method="post" class="stacked-form">
+                    <div class="form-group">
+                        <label for="default_import_status"
+                            >Default status for new Instagram imports</label
+                        >
+                        <select
+                            id="default_import_status"
+                            name="default_import_status"
+                        >
+                            <option
+                                value="draft"
+                                {% if settings.default_import_status == "draft" %}selected{% endif %}
+                            >
+                                Draft
+                            </option>
+                            <option
+                                value="published"
+                                {% if settings.default_import_status == "published" %}selected{% endif %}
+                            >
+                                Published
+                            </option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="instagram_access_token"
+                            >Instagram access token</label
+                        >
+                        <textarea
+                            id="instagram_access_token"
+                            name="instagram_access_token"
+                            placeholder="Paste a working Instagram access token to connect or replace the current account"
+                        ></textarea>
+                        <p class="form-help">
+                            Save a token here, then refresh it periodically to
+                            extend its expiry window.
+                        </p>
+                    </div>
+
+                        <div class="form-actions">
+                            <button type="submit" class="button button-primary">Save Settings</button>
+                        </div>
+                    </form>
+                </section>
+
+                <section class="admin-panel">
+                    <div class="section-heading">
+                        <div>
+                            <p class="eyebrow">Connection</p>
+                            <h3>Instagram</h3>
+                        </div>
+                    </div>
+
+                    {% if instagram_connection %}
+                <div class="detail-list">
+                    <p><strong>Connected account:</strong> {{ instagram_connection.username }}</p>
+                    <p>
+                        <strong>Instagram user id:</strong>
+                        {{ instagram_connection.instagram_user_id }}
+                    </p>
+                    <p>
+                        <strong>Connected at:</strong>
+                        {{ instagram_connection.connected_at }}
+                    </p>
+                    <p>
+                        <strong>Last sync:</strong>
+                        {{ instagram_connection.last_sync_at | default(value="Never") }}
+                    </p>
+                    <p>
+                        <strong>Token expires:</strong>
+                        {{ instagram_connection.token_expires_at | default(value="Unknown") }}
+                    </p>
+                    <div class="inline-actions">
+                        <button
+                            type="button"
+                            class="button button-primary sync-instagram-button"
+                        >
+                            Sync Latest Posts
+                        </button>
+                        <button
+                            type="button"
+                            class="button button-secondary refresh-instagram-button"
+                        >
+                            Refresh Token
+                        </button>
+                        <button
+                            type="button"
+                            class="button button-danger disconnect-instagram-button"
+                        >
+                            Disconnect Instagram
+                        </button>
+                    </div>
+                </div>
+                {% else %}
+                <div class="empty-state admin-empty-state">
+                    <p>
+                        Paste an Instagram access token above, save settings,
+                        and then sync.
+                    </p>
+                </div>
+                {% endif %}
+                </section>
+            </main>
+        </div>
+
+        <script src="/admin/assets/js/admin.js"></script>
+    </body>
+</html>

@@ -5,6 +5,7 @@ pub mod config;
 pub mod database;
 pub mod files;
 pub mod handlers;
+pub mod instagram;
 pub mod middleware;
 pub mod models;
 pub mod routes;

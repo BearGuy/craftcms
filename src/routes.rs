@@ -43,6 +43,7 @@ pub fn admin_routes(
     let admin_page = admin_base
         .and(warp::path::end())
         .and(with_auth(conn.clone()))
+        .and(warp::query::<crate::models::AdminImageQuery>())
         .and(with_config(config.clone()))
         .and(with_db(conn.clone()))
         .and_then(admin_page_handler);
@@ -91,6 +92,63 @@ pub fn admin_routes(
         .and(with_file_manager(file_manager.clone()))
         .and_then(admin_delete_image_handler);
 
+    let admin_restore = admin_base
+        .and(warp::path("restore"))
+        .and(warp::path::param())
+        .and(with_auth(conn.clone()))
+        .and(with_db(conn.clone()))
+        .and_then(admin_restore_image_handler);
+
+    let admin_status = admin_base
+        .and(warp::path("status"))
+        .and(warp::path::param())
+        .and(with_auth(conn.clone()))
+        .and(warp::body::form())
+        .and(with_db(conn.clone()))
+        .and_then(admin_update_status_handler);
+
+    let admin_settings = admin_base
+        .and(warp::path("settings"))
+        .and(warp::path::end())
+        .and(with_auth(conn.clone()))
+        .and(with_config(config.clone()))
+        .and(with_db(conn.clone()))
+        .and_then(admin_settings_page_handler);
+
+    let admin_settings_update = admin_base
+        .and(warp::path("settings"))
+        .and(warp::path("update"))
+        .and(with_auth(conn.clone()))
+        .and(warp::body::form())
+        .and(with_db(conn.clone()))
+        .and_then(admin_update_settings_handler);
+
+    let instagram_disconnect = admin_base
+        .and(warp::path("settings"))
+        .and(warp::path("instagram"))
+        .and(warp::path("disconnect"))
+        .and(with_auth(conn.clone()))
+        .and(with_db(conn.clone()))
+        .and_then(admin_instagram_disconnect_handler);
+
+    let instagram_sync = admin_base
+        .and(warp::path("settings"))
+        .and(warp::path("instagram"))
+        .and(warp::path("sync"))
+        .and(with_auth(conn.clone()))
+        .and(with_config(config.clone()))
+        .and(with_db(conn.clone()))
+        .and(with_file_manager(file_manager.clone()))
+        .and_then(admin_instagram_sync_handler);
+
+    let instagram_refresh = admin_base
+        .and(warp::path("settings"))
+        .and(warp::path("instagram"))
+        .and(warp::path("refresh"))
+        .and(with_auth(conn.clone()))
+        .and(with_db(conn.clone()))
+        .and_then(admin_instagram_refresh_handler);
+
     let admin_assets = warp::path("admin")
         .and(warp::path("assets"))
         .and(warp_embed::embed(&AdminAssets));
@@ -106,4 +164,11 @@ pub fn admin_routes(
         .or(admin_edit)
         .or(admin_update)
         .or(admin_delete)
+        .or(admin_restore)
+        .or(admin_status)
+        .or(admin_settings)
+        .or(admin_settings_update)
+        .or(instagram_disconnect)
+        .or(instagram_sync)
+        .or(instagram_refresh)
 }

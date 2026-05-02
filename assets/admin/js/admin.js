@@ -34,7 +34,6 @@ async function handleDelete(slug) {
 
     showNotification("Image deleted successfully!", "success");
 
-    // Remove the image card from the UI
     const imageCard = document.querySelector(`[data-slug="${slug}"]`);
     if (imageCard) {
       imageCard.remove();
@@ -42,6 +41,50 @@ async function handleDelete(slug) {
   } catch (error) {
     console.error("Delete error:", error);
     showNotification(error.message || "Failed to delete image", "error");
+  }
+}
+
+async function handleRestore(slug) {
+  try {
+    const response = await fetch(`/admin/restore/${slug}`, {
+      method: "POST",
+    });
+
+    if (!response.ok) {
+      throw new Error(await response.text());
+    }
+
+    showNotification("Image restored successfully!", "success");
+    setTimeout(() => {
+      window.location.reload();
+    }, 700);
+  } catch (error) {
+    console.error("Restore error:", error);
+    showNotification(error.message || "Failed to restore image", "error");
+  }
+}
+
+async function handleStatusChange(slug, status) {
+  try {
+    const response = await fetch(`/admin/status/${slug}`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+      },
+      body: new URLSearchParams({ status }),
+    });
+
+    if (!response.ok) {
+      throw new Error(await response.text());
+    }
+
+    showNotification("Image status updated successfully!", "success");
+    setTimeout(() => {
+      window.location.reload();
+    }, 700);
+  } catch (error) {
+    console.error("Status update error:", error);
+    showNotification(error.message || "Failed to update status", "error");
   }
 }
 
@@ -53,6 +96,25 @@ function initDeleteHandlers() {
       handleDelete(slug);
     });
   });
+
+  document.querySelectorAll(".restore-button").forEach((button) => {
+    button.addEventListener("click", (e) => {
+      e.preventDefault();
+      const slug = button.getAttribute("data-slug");
+      handleRestore(slug);
+    });
+  });
+
+  document
+    .querySelectorAll(".publish-button, .draft-button")
+    .forEach((button) => {
+      button.addEventListener("click", (e) => {
+        e.preventDefault();
+        const slug = button.getAttribute("data-slug");
+        const status = button.getAttribute("data-status");
+        handleStatusChange(slug, status);
+      });
+    });
 }
 
 // Image preview functionality
@@ -151,6 +213,44 @@ async function handleFormSubmit(form, successCallback) {
   }
 }
 
+async function handleUrlEncodedFormSubmit(form, successCallback) {
+  try {
+    const formData = new FormData(form);
+    const submitButton = form.querySelector('button[type="submit"]');
+    const originalButtonText = submitButton.textContent;
+
+    submitButton.disabled = true;
+    submitButton.textContent = "Saving...";
+    form.classList.add("loading");
+
+    const response = await fetch(form.action, {
+      method: form.method,
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+      },
+      body: new URLSearchParams(formData),
+    });
+
+    if (!response.ok) {
+      const error = await response.text();
+      throw new Error(error || "Submission failed");
+    }
+
+    showNotification("Success!", "success");
+
+    if (successCallback) {
+      successCallback(response);
+    }
+  } catch (error) {
+    console.error("Submission error:", error);
+    showNotification(error.message || "An error occurred", "error");
+  } finally {
+    submitButton.disabled = false;
+    submitButton.textContent = originalButtonText;
+    form.classList.remove("loading");
+  }
+}
+
 // Notification system
 function showNotification(message, type = "success") {
   // Remove any existing notification
@@ -206,6 +306,109 @@ function initFormHandling() {
       });
     });
   }
+
+  const settingsForm = document.querySelector('form[action="/admin/settings/update"]');
+  if (settingsForm) {
+    settingsForm.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      await handleUrlEncodedFormSubmit(e.target);
+    });
+  }
+}
+
+async function syncInstagram() {
+  try {
+    const response = await fetch("/admin/settings/instagram/sync", {
+      method: "POST",
+    });
+
+    const text = await response.text();
+    if (!response.ok) {
+      throw new Error(text);
+    }
+
+    showNotification(text || "Instagram sync complete", "success");
+    setTimeout(() => {
+      window.location.reload();
+    }, 1000);
+  } catch (error) {
+    console.error("Instagram sync error:", error);
+    showNotification(error.message || "Instagram sync failed", "error");
+  }
+}
+
+async function disconnectInstagram() {
+  try {
+    const response = await fetch("/admin/settings/instagram/disconnect", {
+      method: "POST",
+    });
+
+    const text = await response.text();
+    if (!response.ok) {
+      throw new Error(text);
+    }
+
+    showNotification(text || "Instagram disconnected", "success");
+    setTimeout(() => {
+      window.location.reload();
+    }, 700);
+  } catch (error) {
+    console.error("Instagram disconnect error:", error);
+    showNotification(
+      error.message || "Failed to disconnect Instagram",
+      "error",
+    );
+  }
+}
+
+async function refreshInstagramToken() {
+  try {
+    const response = await fetch("/admin/settings/instagram/refresh", {
+      method: "POST",
+    });
+
+    const text = await response.text();
+    if (!response.ok) {
+      throw new Error(text);
+    }
+
+    showNotification(text || "Instagram token refreshed", "success");
+    setTimeout(() => {
+      window.location.reload();
+    }, 700);
+  } catch (error) {
+    console.error("Instagram refresh error:", error);
+    showNotification(
+      error.message || "Failed to refresh Instagram token",
+      "error",
+    );
+  }
+}
+
+function initSettingsActions() {
+  const syncButton = document.querySelector(".sync-instagram-button");
+  if (syncButton) {
+    syncButton.addEventListener("click", (e) => {
+      e.preventDefault();
+      syncInstagram();
+    });
+  }
+
+  const disconnectButton = document.querySelector(".disconnect-instagram-button");
+  if (disconnectButton) {
+    disconnectButton.addEventListener("click", (e) => {
+      e.preventDefault();
+      disconnectInstagram();
+    });
+  }
+
+  const refreshButton = document.querySelector(".refresh-instagram-button");
+  if (refreshButton) {
+    refreshButton.addEventListener("click", (e) => {
+      e.preventDefault();
+      refreshInstagramToken();
+    });
+  }
 }
 
 // Initialize all admin functionality
@@ -215,4 +418,5 @@ document.addEventListener("DOMContentLoaded", function () {
   initImagePreview();
   initSlugGenerator();
   initFormHandling();
+  initSettingsActions();
 });

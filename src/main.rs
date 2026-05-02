@@ -5,7 +5,7 @@ use std::io::Read; // Add this import
 #[derive(Parser)]
 #[clap(
     name = "craftcms",
-    version = "0.1.0",
+    version = env!("CARGO_PKG_VERSION"),
     about = "A simple CMS for managing and serving templated HTML documents with images."
 )]
 struct Cli {

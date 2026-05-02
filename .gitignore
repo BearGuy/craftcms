@@ -55,3 +55,4 @@ logs/
 
 # Nix outputs
 /result
+.direnv/

@@ -77,9 +77,13 @@ impl Default for ServerConfig {
 
 #[derive(Default, Debug, Deserialize, Clone)]
 pub struct Config {
+    #[serde(default)]
     pub site: SiteConfig,
+    #[serde(default)]
     pub routes: RoutesConfig,
+    #[serde(default)]
     pub server: ServerConfig,
+    #[serde(default)]
     pub meta: MetaConfig,
 }
 

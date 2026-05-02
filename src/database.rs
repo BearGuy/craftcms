@@ -1,4 +1,4 @@
-use crate::models::{Image, User};
+use crate::models::{AppSettings, Image, InstagramConnection, User};
 use rusqlite::{params, Connection, Error};
 use uuid::Uuid;
 
@@ -23,6 +23,12 @@ pub fn run_migrations(conn: &Connection) -> Result<(), Error> {
             slug TEXT UNIQUE NOT NULL,
             keywords TEXT,
             filename TEXT NOT NULL,
+            status TEXT NOT NULL DEFAULT 'published',
+            deleted_at TEXT,
+            source TEXT NOT NULL DEFAULT 'manual',
+            source_media_id TEXT,
+            source_permalink TEXT,
+            source_timestamp TEXT,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         );
@@ -42,8 +48,91 @@ pub fn run_migrations(conn: &Connection) -> Result<(), Error> {
             expires_at DATETIME NOT NULL,
             FOREIGN KEY(user_id) REFERENCES users(id)
         );
+
+        CREATE TABLE IF NOT EXISTS app_settings (
+            key TEXT PRIMARY KEY,
+            value TEXT NOT NULL
+        );
+
+        CREATE TABLE IF NOT EXISTS instagram_connections (
+            id INTEGER PRIMARY KEY CHECK (id = 1),
+            instagram_user_id TEXT NOT NULL,
+            username TEXT NOT NULL,
+            access_token TEXT NOT NULL,
+            token_expires_at TEXT,
+            connected_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            last_sync_at TEXT
+        );
         "#,
     )?;
+
+    ensure_column(
+        conn,
+        "images",
+        "status",
+        "ALTER TABLE images ADD COLUMN status TEXT NOT NULL DEFAULT 'published'",
+    )?;
+    ensure_column(
+        conn,
+        "images",
+        "deleted_at",
+        "ALTER TABLE images ADD COLUMN deleted_at TEXT",
+    )?;
+    ensure_column(
+        conn,
+        "images",
+        "source",
+        "ALTER TABLE images ADD COLUMN source TEXT NOT NULL DEFAULT 'manual'",
+    )?;
+    ensure_column(
+        conn,
+        "images",
+        "source_media_id",
+        "ALTER TABLE images ADD COLUMN source_media_id TEXT",
+    )?;
+    ensure_column(
+        conn,
+        "images",
+        "source_permalink",
+        "ALTER TABLE images ADD COLUMN source_permalink TEXT",
+    )?;
+    ensure_column(
+        conn,
+        "images",
+        "source_timestamp",
+        "ALTER TABLE images ADD COLUMN source_timestamp TEXT",
+    )?;
+
+    conn.execute(
+        "INSERT OR IGNORE INTO app_settings (key, value) VALUES ('default_import_status', 'draft')",
+        [],
+    )?;
+
+    conn.execute(
+        "CREATE UNIQUE INDEX IF NOT EXISTS idx_images_source_media_id ON images(source_media_id)",
+        [],
+    )?;
+    Ok(())
+}
+
+fn ensure_column(
+    conn: &Connection,
+    table: &str,
+    column: &str,
+    alter_sql: &str,
+) -> Result<(), Error> {
+    let mut stmt = conn.prepare(&format!("PRAGMA table_info({table})"))?;
+    let columns = stmt.query_map([], |row| row.get::<_, String>(1))?;
+    let mut found = false;
+    for existing in columns {
+        if existing? == column {
+            found = true;
+            break;
+        }
+    }
+    if !found {
+        conn.execute(alter_sql, [])?;
+    }
     Ok(())
 }
 
@@ -153,48 +242,119 @@ pub fn delete_session(conn: &Connection, session_id: &str) -> Result<(), Error> 
     Ok(())
 }
 
+fn row_to_image(row: &rusqlite::Row<'_>) -> Result<Image, Error> {
+    Ok(Image {
+        alt: row.get(0)?,
+        description: row.get(1)?,
+        slug: row.get(2)?,
+        keywords: serde_json::from_str(&row.get::<_, String>(3)?).unwrap_or_default(),
+        filename: row.get(4)?,
+        status: row.get(5)?,
+        deleted_at: row.get(6)?,
+        source: row.get(7)?,
+        source_media_id: row.get(8)?,
+        source_permalink: row.get(9)?,
+        source_timestamp: row.get(10)?,
+    })
+}
+
 pub fn get_images(conn: &Connection) -> Result<Vec<Image>, Error> {
     let mut stmt = conn.prepare(
-        "SELECT alt, description, slug, keywords, filename FROM images ORDER BY created_at DESC",
+        "SELECT alt, description, slug, keywords, filename, status, deleted_at, source, source_media_id, source_permalink, source_timestamp
+         FROM images
+         WHERE deleted_at IS NULL AND status = 'published'
+         ORDER BY created_at DESC",
     )?;
-    let rows = stmt.query_map(params![], |row| {
-        Ok(Image {
-            alt: row.get(0)?,
-            description: row.get(1)?,
-            slug: row.get(2)?,
-            keywords: serde_json::from_str(&row.get::<_, String>(3)?).unwrap_or_default(),
-            filename: row.get(4)?,
-        })
-    })?;
+    let rows = stmt.query_map(params![], row_to_image)?;
 
     rows.collect()
 }
 
-pub fn get_image_by_slug(conn: &Connection, slug: &str) -> Result<Image, Error> {
-    let mut stmt = conn
-        .prepare("SELECT alt, description, slug, keywords, filename FROM images WHERE slug = ?")?;
+pub fn get_admin_images(conn: &Connection, filter: &str) -> Result<Vec<Image>, Error> {
+    let sql = match filter {
+        "published" => {
+            "SELECT alt, description, slug, keywords, filename, status, deleted_at, source, source_media_id, source_permalink, source_timestamp
+             FROM images
+             WHERE deleted_at IS NULL AND status = 'published'
+             ORDER BY created_at DESC"
+        }
+        "draft" => {
+            "SELECT alt, description, slug, keywords, filename, status, deleted_at, source, source_media_id, source_permalink, source_timestamp
+             FROM images
+             WHERE deleted_at IS NULL AND status = 'draft'
+             ORDER BY created_at DESC"
+        }
+        "deleted" => {
+            "SELECT alt, description, slug, keywords, filename, status, deleted_at, source, source_media_id, source_permalink, source_timestamp
+             FROM images
+             WHERE deleted_at IS NOT NULL
+             ORDER BY deleted_at DESC, created_at DESC"
+        }
+        _ => {
+            "SELECT alt, description, slug, keywords, filename, status, deleted_at, source, source_media_id, source_permalink, source_timestamp
+             FROM images
+             WHERE deleted_at IS NULL
+             ORDER BY created_at DESC"
+        }
+    };
+    let mut stmt = conn.prepare(sql)?;
+    let rows = stmt.query_map([], row_to_image)?;
+    rows.collect()
+}
 
-    stmt.query_row(params![slug], |row| {
-        Ok(Image {
-            alt: row.get(0)?,
-            description: row.get(1)?,
-            slug: row.get(2)?,
-            keywords: serde_json::from_str(&row.get::<_, String>(3)?).unwrap_or_default(),
-            filename: row.get(4)?,
-        })
-    })
+pub fn get_image_by_slug(conn: &Connection, slug: &str) -> Result<Image, Error> {
+    let mut stmt = conn.prepare(
+        "SELECT alt, description, slug, keywords, filename, status, deleted_at, source, source_media_id, source_permalink, source_timestamp
+         FROM images WHERE slug = ?",
+    )?;
+
+    stmt.query_row(params![slug], row_to_image)
+}
+
+pub fn get_site_image_by_slug(conn: &Connection, slug: &str) -> Result<Image, Error> {
+    let mut stmt = conn.prepare(
+        "SELECT alt, description, slug, keywords, filename, status, deleted_at, source, source_media_id, source_permalink, source_timestamp
+         FROM images WHERE slug = ? AND deleted_at IS NULL AND status = 'published'",
+    )?;
+    stmt.query_row(params![slug], row_to_image)
+}
+
+pub fn get_image_by_source_media_id(
+    conn: &Connection,
+    source_media_id: &str,
+) -> Result<Image, Error> {
+    let mut stmt = conn.prepare(
+        "SELECT alt, description, slug, keywords, filename, status, deleted_at, source, source_media_id, source_permalink, source_timestamp
+         FROM images WHERE source_media_id = ?",
+    )?;
+    stmt.query_row(params![source_media_id], row_to_image)
+}
+
+pub fn slug_exists(conn: &Connection, slug: &str) -> Result<bool, Error> {
+    let count: i64 = conn.query_row(
+        "SELECT COUNT(*) FROM images WHERE slug = ?",
+        [slug],
+        |row| row.get(0),
+    )?;
+    Ok(count > 0)
 }
 
 pub fn insert_image(conn: &Connection, image: &Image) -> Result<(), Error> {
     conn.execute(
-        "INSERT INTO images (alt, description, slug, keywords, filename)
-         VALUES (?1, ?2, ?3, ?4, ?5)",
+        "INSERT INTO images (alt, description, slug, keywords, filename, status, deleted_at, source, source_media_id, source_permalink, source_timestamp)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)",
         params![
             &image.alt,
             &image.description,
             &image.slug,
             serde_json::to_string(&image.keywords).unwrap(),
             &image.filename,
+            &image.status,
+            &image.deleted_at,
+            &image.source,
+            &image.source_media_id,
+            &image.source_permalink,
+            &image.source_timestamp,
         ],
     )?;
     Ok(())
@@ -202,21 +362,151 @@ pub fn insert_image(conn: &Connection, image: &Image) -> Result<(), Error> {
 
 pub fn update_image(conn: &Connection, slug: &str, image: &Image) -> Result<(), Error> {
     conn.execute(
-        "UPDATE images SET alt = ?1, description = ?2, slug = ?3, keywords = ?4, filename = ?5 WHERE slug = ?6",
+        "UPDATE images
+         SET alt = ?1, description = ?2, slug = ?3, keywords = ?4, filename = ?5, status = ?6, deleted_at = ?7, source = ?8, source_media_id = ?9, source_permalink = ?10, source_timestamp = ?11
+         WHERE slug = ?12",
         params![
             &image.alt,
             &image.description,
             &image.slug,
             serde_json::to_string(&image.keywords).unwrap(),
             &image.filename,
+            &image.status,
+            &image.deleted_at,
+            &image.source,
+            &image.source_media_id,
+            &image.source_permalink,
+            &image.source_timestamp,
             slug,
         ],
     )?;
     Ok(())
 }
 
-pub fn delete_image(conn: &Connection, slug: &str) -> Result<(), Error> {
-    conn.execute("DELETE FROM images WHERE slug = ?", params![slug])?;
+pub fn soft_delete_image(conn: &Connection, slug: &str) -> Result<(), Error> {
+    conn.execute(
+        "UPDATE images SET deleted_at = datetime('now') WHERE slug = ?",
+        params![slug],
+    )?;
+    Ok(())
+}
+
+pub fn restore_image(conn: &Connection, slug: &str) -> Result<(), Error> {
+    conn.execute(
+        "UPDATE images SET deleted_at = NULL WHERE slug = ?",
+        params![slug],
+    )?;
+    Ok(())
+}
+
+pub fn update_image_status(conn: &Connection, slug: &str, status: &str) -> Result<(), Error> {
+    conn.execute(
+        "UPDATE images SET status = ?1 WHERE slug = ?2",
+        params![status, slug],
+    )?;
+    Ok(())
+}
+
+pub fn get_app_settings(conn: &Connection) -> Result<AppSettings, Error> {
+    let default_import_status: String = conn.query_row(
+        "SELECT value FROM app_settings WHERE key = 'default_import_status'",
+        [],
+        |row| row.get(0),
+    )?;
+    Ok(AppSettings {
+        default_import_status,
+    })
+}
+
+pub fn update_default_import_status(conn: &Connection, status: &str) -> Result<(), Error> {
+    conn.execute(
+        "INSERT INTO app_settings (key, value) VALUES ('default_import_status', ?1)
+         ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+        [status],
+    )?;
+    Ok(())
+}
+
+pub fn get_setting(conn: &Connection, key: &str) -> Result<Option<String>, Error> {
+    let mut stmt = conn.prepare("SELECT value FROM app_settings WHERE key = ?")?;
+    let mut rows = stmt.query([key])?;
+    if let Some(row) = rows.next()? {
+        Ok(Some(row.get(0)?))
+    } else {
+        Ok(None)
+    }
+}
+
+pub fn set_setting(conn: &Connection, key: &str, value: &str) -> Result<(), Error> {
+    conn.execute(
+        "INSERT INTO app_settings (key, value) VALUES (?1, ?2)
+         ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+        params![key, value],
+    )?;
+    Ok(())
+}
+
+pub fn delete_setting(conn: &Connection, key: &str) -> Result<(), Error> {
+    conn.execute("DELETE FROM app_settings WHERE key = ?", [key])?;
+    Ok(())
+}
+
+pub fn get_instagram_connection(conn: &Connection) -> Result<Option<InstagramConnection>, Error> {
+    let mut stmt = conn.prepare(
+        "SELECT instagram_user_id, username, access_token, token_expires_at, connected_at, last_sync_at
+         FROM instagram_connections WHERE id = 1",
+    )?;
+    let mut rows = stmt.query([])?;
+    if let Some(row) = rows.next()? {
+        Ok(Some(InstagramConnection {
+            instagram_user_id: row.get(0)?,
+            username: row.get(1)?,
+            access_token: row.get(2)?,
+            token_expires_at: row.get(3)?,
+            connected_at: row.get(4)?,
+            last_sync_at: row.get(5)?,
+        }))
+    } else {
+        Ok(None)
+    }
+}
+
+pub fn save_instagram_connection(
+    conn: &Connection,
+    connection: &InstagramConnection,
+) -> Result<(), Error> {
+    conn.execute(
+        "INSERT INTO instagram_connections (id, instagram_user_id, username, access_token, token_expires_at, connected_at, last_sync_at)
+         VALUES (1, ?1, ?2, ?3, ?4, ?5, ?6)
+         ON CONFLICT(id) DO UPDATE SET
+             instagram_user_id = excluded.instagram_user_id,
+             username = excluded.username,
+             access_token = excluded.access_token,
+             token_expires_at = excluded.token_expires_at,
+             connected_at = excluded.connected_at,
+             last_sync_at = excluded.last_sync_at",
+        params![
+            connection.instagram_user_id,
+            connection.username,
+            connection.access_token,
+            connection.token_expires_at,
+            connection.connected_at,
+            connection.last_sync_at,
+        ],
+    )?;
+    Ok(())
+}
+
+pub fn delete_instagram_connection(conn: &Connection) -> Result<(), Error> {
+    conn.execute("DELETE FROM instagram_connections WHERE id = 1", [])?;
+    Ok(())
+}
+
+pub fn update_instagram_last_sync(conn: &Connection, last_sync_at: &str) -> Result<(), Error> {
+    conn.execute(
+        "UPDATE instagram_connections SET last_sync_at = ?1 WHERE id = 1",
+        [last_sync_at],
+    )?;
     Ok(())
 }
 
@@ -231,6 +521,12 @@ mod tests {
             slug: slug.to_string(),
             keywords: vec!["one".to_string(), "two".to_string()],
             filename: filename.to_string(),
+            status: "published".to_string(),
+            deleted_at: None,
+            source: "manual".to_string(),
+            source_media_id: None,
+            source_permalink: None,
+            source_timestamp: None,
         }
     }
 
@@ -246,5 +542,30 @@ mod tests {
 
         let saved = get_image_by_slug(&conn, "new-slug").unwrap();
         assert_eq!(saved.filename, "new-slug.png");
+    }
+
+    #[test]
+    fn public_queries_only_return_published_non_deleted_images() {
+        let conn = Connection::open_in_memory().unwrap();
+        run_migrations(&conn).unwrap();
+
+        let mut published = image("published", "published.jpg");
+        published.status = "published".to_string();
+
+        let mut draft = image("draft", "draft.jpg");
+        draft.status = "draft".to_string();
+
+        let mut deleted = image("deleted", "deleted.jpg");
+        deleted.deleted_at = Some("2026-01-01 00:00:00".to_string());
+
+        insert_image(&conn, &published).unwrap();
+        insert_image(&conn, &draft).unwrap();
+        insert_image(&conn, &deleted).unwrap();
+
+        let public_images = get_images(&conn).unwrap();
+        assert_eq!(public_images.len(), 1);
+        assert_eq!(public_images[0].slug, "published");
+        assert!(get_site_image_by_slug(&conn, "draft").is_err());
+        assert!(get_site_image_by_slug(&conn, "deleted").is_err());
     }
 }

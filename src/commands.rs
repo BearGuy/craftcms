@@ -45,19 +45,42 @@ pub fn update_image(
         }
     };
 
-    let image_to_save = Image { filename, ..image };
+    let image_to_save = Image {
+        deleted_at: existing.deleted_at,
+        source: existing.source,
+        source_media_id: existing.source_media_id,
+        source_permalink: existing.source_permalink,
+        source_timestamp: existing.source_timestamp,
+        filename,
+        ..image
+    };
 
     database::update_image(conn, old_slug, &image_to_save).map_err(|e| e.into())
 }
 
 pub fn delete_image(
     conn: &Connection,
-    file_manager: &ImageFileManager,
+    _file_manager: &ImageFileManager,
     slug: &str,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let image = database::get_image_by_slug(conn, slug)?;
-    file_manager.delete_file(&image.filename)?;
-    database::delete_image(conn, slug)?;
+    database::soft_delete_image(conn, slug)?;
+    Ok(())
+}
+
+pub fn restore_image(
+    conn: &Connection,
+    slug: &str,
+) -> Result<(), Box<dyn std::error::Error>> {
+    database::restore_image(conn, slug)?;
+    Ok(())
+}
+
+pub fn update_image_status(
+    conn: &Connection,
+    slug: &str,
+    status: &str,
+) -> Result<(), Box<dyn std::error::Error>> {
+    database::update_image_status(conn, slug, status)?;
     Ok(())
 }
 

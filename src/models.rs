@@ -14,6 +14,12 @@ pub struct Image {
     pub slug: String,
     pub keywords: Vec<String>,
     pub filename: String,
+    pub status: String,
+    pub deleted_at: Option<String>,
+    pub source: String,
+    pub source_media_id: Option<String>,
+    pub source_permalink: Option<String>,
+    pub source_timestamp: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -23,6 +29,45 @@ pub struct ImageForm {
     pub slug: String,
     pub keywords: String,
     pub image_data: Vec<u8>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct AdminImageQuery {
+    pub filter: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct ImageStatusForm {
+    pub status: String,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct AdminSettingsForm {
+    pub default_import_status: String,
+    pub instagram_access_token: Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct AppSettings {
+    pub default_import_status: String,
+}
+
+impl Default for AppSettings {
+    fn default() -> Self {
+        Self {
+            default_import_status: "draft".to_string(),
+        }
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct InstagramConnection {
+    pub instagram_user_id: String,
+    pub username: String,
+    pub access_token: String,
+    pub token_expires_at: Option<String>,
+    pub connected_at: String,
+    pub last_sync_at: Option<String>,
 }
 
 #[derive(Deserialize)]

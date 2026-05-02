@@ -74,6 +74,12 @@ pub fn handle_insert_image(
         slug: input.slug,
         keywords: input.keywords,
         filename: String::new(), // Will be set during save
+        status: "published".to_string(),
+        deleted_at: None,
+        source: "manual".to_string(),
+        source_media_id: None,
+        source_permalink: None,
+        source_timestamp: None,
     };
 
     // Use insert_image_from_path since we have a file path in input.url
