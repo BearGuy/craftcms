@@ -1,6 +1,6 @@
 [package]
 name = "craftcms"
-version = "0.2.3"
+version = "0.2.4"
 edition = "2021"
 authors = ["Stephen Peterkins <stephen@peterkins.dev>"]
 description = "A simple CMS for managing and serving templated HTML documents."

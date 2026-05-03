@@ -263,7 +263,9 @@ pub fn get_images(conn: &Connection) -> Result<Vec<Image>, Error> {
         "SELECT alt, description, slug, keywords, filename, status, deleted_at, source, source_media_id, source_permalink, source_timestamp
          FROM images
          WHERE deleted_at IS NULL AND status = 'published'
-         ORDER BY created_at DESC",
+         ORDER BY CASE WHEN source_timestamp IS NULL THEN 1 ELSE 0 END ASC,
+                  COALESCE(replace(substr(source_timestamp, 1, 19), 'T', ' '), created_at) DESC,
+                  created_at DESC",
     )?;
     let rows = stmt.query_map(params![], row_to_image)?;
 
@@ -276,25 +278,34 @@ pub fn get_admin_images(conn: &Connection, filter: &str) -> Result<Vec<Image>, E
             "SELECT alt, description, slug, keywords, filename, status, deleted_at, source, source_media_id, source_permalink, source_timestamp
              FROM images
              WHERE deleted_at IS NULL AND status = 'published'
-             ORDER BY created_at DESC"
+             ORDER BY CASE WHEN source_timestamp IS NULL THEN 1 ELSE 0 END ASC,
+                      COALESCE(replace(substr(source_timestamp, 1, 19), 'T', ' '), created_at) DESC,
+                      created_at DESC"
         }
         "draft" => {
             "SELECT alt, description, slug, keywords, filename, status, deleted_at, source, source_media_id, source_permalink, source_timestamp
              FROM images
              WHERE deleted_at IS NULL AND status = 'draft'
-             ORDER BY created_at DESC"
+             ORDER BY CASE WHEN source_timestamp IS NULL THEN 1 ELSE 0 END ASC,
+                      COALESCE(replace(substr(source_timestamp, 1, 19), 'T', ' '), created_at) DESC,
+                      created_at DESC"
         }
         "deleted" => {
             "SELECT alt, description, slug, keywords, filename, status, deleted_at, source, source_media_id, source_permalink, source_timestamp
              FROM images
              WHERE deleted_at IS NOT NULL
-             ORDER BY deleted_at DESC, created_at DESC"
+             ORDER BY deleted_at DESC,
+                      CASE WHEN source_timestamp IS NULL THEN 1 ELSE 0 END ASC,
+                      COALESCE(replace(substr(source_timestamp, 1, 19), 'T', ' '), created_at) DESC,
+                      created_at DESC"
         }
         _ => {
             "SELECT alt, description, slug, keywords, filename, status, deleted_at, source, source_media_id, source_permalink, source_timestamp
              FROM images
              WHERE deleted_at IS NULL
-             ORDER BY created_at DESC"
+             ORDER BY CASE WHEN source_timestamp IS NULL THEN 1 ELSE 0 END ASC,
+                      COALESCE(replace(substr(source_timestamp, 1, 19), 'T', ' '), created_at) DESC,
+                      created_at DESC"
         }
     };
     let mut stmt = conn.prepare(sql)?;
@@ -567,5 +578,67 @@ mod tests {
         assert_eq!(public_images[0].slug, "published");
         assert!(get_site_image_by_slug(&conn, "draft").is_err());
         assert!(get_site_image_by_slug(&conn, "deleted").is_err());
+    }
+
+    #[test]
+    fn public_queries_prefer_instagram_source_timestamp_for_sorting() {
+        let conn = Connection::open_in_memory().unwrap();
+        run_migrations(&conn).unwrap();
+
+        let mut newer_post = image("newer-post", "newer.jpg");
+        newer_post.source = "instagram".to_string();
+        newer_post.source_timestamp = Some("2026-04-29T21:58:22+0000".to_string());
+
+        let mut older_post = image("older-post", "older.jpg");
+        older_post.source = "instagram".to_string();
+        older_post.source_timestamp = Some("2025-08-05T19:23:43+0000".to_string());
+
+        insert_image(&conn, &newer_post).unwrap();
+        insert_image(&conn, &older_post).unwrap();
+
+        conn.execute(
+            "UPDATE images SET created_at = '2026-05-02 16:42:55' WHERE slug = 'newer-post'",
+            [],
+        )
+        .unwrap();
+        conn.execute(
+            "UPDATE images SET created_at = '2026-05-02 16:42:57' WHERE slug = 'older-post'",
+            [],
+        )
+        .unwrap();
+
+        let public_images = get_images(&conn).unwrap();
+        assert_eq!(public_images[0].slug, "newer-post");
+        assert_eq!(public_images[1].slug, "older-post");
+    }
+
+    #[test]
+    fn timestamped_images_sort_ahead_of_undated_manual_imports() {
+        let conn = Connection::open_in_memory().unwrap();
+        run_migrations(&conn).unwrap();
+
+        let mut instagram = image("instagram-post", "instagram.jpg");
+        instagram.source = "instagram".to_string();
+        instagram.source_timestamp = Some("2026-04-29T21:58:22+0000".to_string());
+
+        let manual = image("manual-post", "manual.jpg");
+
+        insert_image(&conn, &instagram).unwrap();
+        insert_image(&conn, &manual).unwrap();
+
+        conn.execute(
+            "UPDATE images SET created_at = '2026-05-02 16:42:20' WHERE slug = 'instagram-post'",
+            [],
+        )
+        .unwrap();
+        conn.execute(
+            "UPDATE images SET created_at = '2026-05-02 16:59:26' WHERE slug = 'manual-post'",
+            [],
+        )
+        .unwrap();
+
+        let public_images = get_images(&conn).unwrap();
+        assert_eq!(public_images[0].slug, "instagram-post");
+        assert_eq!(public_images[1].slug, "manual-post");
     }
 }
