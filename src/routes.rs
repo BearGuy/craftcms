@@ -11,6 +11,8 @@ use warp::Filter;
 
 use crate::admin_assets::AdminAssets;
 
+const MAX_MULTIPART_BYTES: u64 = 12 * 1024 * 1024;
+
 pub fn admin_routes(
     config: Arc<Config>,
     conn: Arc<Mutex<Connection>>,
@@ -58,10 +60,12 @@ pub fn admin_routes(
     // Create image endpoint
     let admin_create = admin_base
         .and(warp::path("create"))
+        .and(warp::post())
         .and(with_auth(conn.clone()))
+        .and(warp::body::content_length_limit(MAX_MULTIPART_BYTES))
         .and(warp::multipart::form())
         .and(with_db(conn.clone()))
-        .and(with_file_manager(file_manager.clone())) // Add this line
+        .and(with_file_manager(file_manager.clone()))
         .and_then(admin_create_image_handler);
 
     // Edit image page
@@ -77,7 +81,9 @@ pub fn admin_routes(
     let admin_update = admin_base
         .and(warp::path("update"))
         .and(warp::path::param())
+        .and(warp::post())
         .and(with_auth(conn.clone()))
+        .and(warp::body::content_length_limit(MAX_MULTIPART_BYTES))
         .and(warp::multipart::form())
         .and(with_db(conn.clone()))
         .and(with_file_manager(file_manager.clone()))
@@ -87,6 +93,7 @@ pub fn admin_routes(
     let admin_delete = admin_base
         .and(warp::path("delete"))
         .and(warp::path::param())
+        .and(warp::delete())
         .and(with_auth(conn.clone()))
         .and(with_db(conn.clone()))
         .and(with_file_manager(file_manager.clone()))
@@ -95,6 +102,7 @@ pub fn admin_routes(
     let admin_restore = admin_base
         .and(warp::path("restore"))
         .and(warp::path::param())
+        .and(warp::post())
         .and(with_auth(conn.clone()))
         .and(with_db(conn.clone()))
         .and_then(admin_restore_image_handler);
@@ -102,6 +110,7 @@ pub fn admin_routes(
     let admin_status = admin_base
         .and(warp::path("status"))
         .and(warp::path::param())
+        .and(warp::post())
         .and(with_auth(conn.clone()))
         .and(warp::body::form())
         .and(with_db(conn.clone()))
@@ -118,6 +127,7 @@ pub fn admin_routes(
     let admin_settings_update = admin_base
         .and(warp::path("settings"))
         .and(warp::path("update"))
+        .and(warp::post())
         .and(with_auth(conn.clone()))
         .and(warp::body::form())
         .and(with_db(conn.clone()))
@@ -127,6 +137,7 @@ pub fn admin_routes(
         .and(warp::path("settings"))
         .and(warp::path("instagram"))
         .and(warp::path("disconnect"))
+        .and(warp::post())
         .and(with_auth(conn.clone()))
         .and(with_db(conn.clone()))
         .and_then(admin_instagram_disconnect_handler);
@@ -135,6 +146,7 @@ pub fn admin_routes(
         .and(warp::path("settings"))
         .and(warp::path("instagram"))
         .and(warp::path("sync"))
+        .and(warp::post())
         .and(with_auth(conn.clone()))
         .and(with_config(config.clone()))
         .and(with_db(conn.clone()))
@@ -145,6 +157,7 @@ pub fn admin_routes(
         .and(warp::path("settings"))
         .and(warp::path("instagram"))
         .and(warp::path("refresh"))
+        .and(warp::post())
         .and(with_auth(conn.clone()))
         .and(with_db(conn.clone()))
         .and_then(admin_instagram_refresh_handler);

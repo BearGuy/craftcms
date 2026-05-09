@@ -109,6 +109,45 @@ impl fmt::Display for CustomError {
 
 impl Reject for CustomError {}
 
+pub fn is_valid_slug(slug: &str) -> bool {
+    !slug.is_empty()
+        && slug.len() <= 160
+        && slug
+            .bytes()
+            .all(|byte| byte.is_ascii_lowercase() || byte.is_ascii_digit() || byte == b'-')
+        && !slug.starts_with('-')
+        && !slug.ends_with('-')
+        && !slug.contains("--")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::is_valid_slug;
+
+    #[test]
+    fn slug_validation_accepts_safe_slugs() {
+        assert!(is_valid_slug("muddy-venture-piece-01"));
+        assert!(is_valid_slug("abc123"));
+    }
+
+    #[test]
+    fn slug_validation_rejects_path_and_ambiguous_slugs() {
+        for slug in [
+            "",
+            "../escape",
+            "has/slash",
+            "has space",
+            "HasUppercase",
+            "-leading",
+            "trailing-",
+            "double--dash",
+            "emoji-💌",
+        ] {
+            assert!(!is_valid_slug(slug), "{slug} should be rejected");
+        }
+    }
+}
+
 #[derive(Deserialize)]
 pub struct LoginCredentials {
     pub email: String,

@@ -195,9 +195,7 @@ pub fn flatten_media(items: &[InstagramMedia]) -> Vec<FlattenedInstagramMedia> {
     flattened
 }
 
-pub async fn download_media(
-    media_url: &str,
-) -> Result<(Vec<u8>, mime::Mime), CustomError> {
+pub async fn download_media(media_url: &str) -> Result<(Vec<u8>, mime::Mime), CustomError> {
     let response = reqwest::get(media_url)
         .await
         .map_err(|e| CustomError::new(format!("Failed to download Instagram media: {e}")))?;

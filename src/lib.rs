@@ -48,12 +48,13 @@ pub async fn handle_rejection(
             .unwrap();
         Ok(response)
     } else if let Some(e) = err.find::<CustomError>() {
+        let status = custom_error_status(&e.message);
         let response = Response::builder()
-            .status(StatusCode::UNAUTHORIZED)
+            .status(status)
             .body(e.message.clone())
             .unwrap();
         Ok(response)
-    } else if let Some(_) = err.find::<warp::reject::PayloadTooLarge>() {
+    } else if err.find::<warp::reject::PayloadTooLarge>().is_some() {
         println!("Payload too large");
         let response = Response::builder()
             .status(StatusCode::BAD_REQUEST)
@@ -69,14 +70,27 @@ pub async fn handle_rejection(
     }
 }
 
+fn custom_error_status(message: &str) -> StatusCode {
+    let lower = message.to_ascii_lowercase();
+    if lower.contains("not found") {
+        StatusCode::NOT_FOUND
+    } else if lower.contains("internal server error") || lower.contains("failed to load") {
+        StatusCode::INTERNAL_SERVER_ERROR
+    } else if lower.contains("invalid credentials") || lower.contains("authentication") {
+        StatusCode::UNAUTHORIZED
+    } else {
+        StatusCode::BAD_REQUEST
+    }
+}
+
 pub async fn run_server() {
     // Load configuration
     let config = Arc::new(config::Config::load().expect("Failed to load configuration"));
 
     // Initialize database connection
-    let conn = Arc::new(Mutex::new(
-        database::init_db().expect("Failed to initialize database"),
-    ));
+    let raw_conn = database::init_db().expect("Failed to initialize database");
+    database::run_migrations(&raw_conn).expect("Failed to run database migrations");
+    let conn = Arc::new(Mutex::new(raw_conn));
 
     // Initialize file manager
     let file_manager = Arc::new(ImageFileManager::new("data/images"));

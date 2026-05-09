@@ -67,10 +67,7 @@ pub fn delete_image(
     Ok(())
 }
 
-pub fn restore_image(
-    conn: &Connection,
-    slug: &str,
-) -> Result<(), Box<dyn std::error::Error>> {
+pub fn restore_image(conn: &Connection, slug: &str) -> Result<(), Box<dyn std::error::Error>> {
     database::restore_image(conn, slug)?;
     Ok(())
 }

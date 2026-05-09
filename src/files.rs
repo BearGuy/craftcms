@@ -1,6 +1,8 @@
 use mime::Mime;
 use std::path::{Path, PathBuf};
 
+use crate::models::is_valid_slug;
+
 pub struct ImageFileManager {
     base_path: PathBuf,
 }
@@ -18,6 +20,13 @@ impl ImageFileManager {
         slug: &str,
         mime_type: &Mime,
     ) -> Result<String, std::io::Error> {
+        if !is_valid_slug(slug) {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidInput,
+                "Invalid image slug",
+            ));
+        }
+
         println!("Saving file with mime type: {:?}", mime_type);
         let extension = match (mime_type.type_(), mime_type.subtype()) {
             (mime::IMAGE, mime::JPEG) => "jpg",
@@ -68,6 +77,13 @@ impl ImageFileManager {
     }
 
     pub fn rename_file(&self, old_filename: &str, new_filename: &str) -> std::io::Result<String> {
+        if !is_valid_slug(new_filename) {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidInput,
+                "Invalid image slug",
+            ));
+        }
+
         let old_path = self.base_path.join(old_filename);
         let extension = Path::new(old_filename)
             .extension()

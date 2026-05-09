@@ -4,7 +4,8 @@ use crate::database;
 use crate::files::ImageFileManager;
 use crate::instagram;
 use crate::models::{
-    AdminSettingsForm, CustomError, Image, ImageStatusForm, InstagramConnection, LoginCredentials,
+    is_valid_slug, AdminSettingsForm, CustomError, Image, ImageStatusForm, InstagramConnection,
+    LoginCredentials,
 };
 use chrono::Utc;
 use rusqlite::Connection;
@@ -194,7 +195,9 @@ pub async fn admin_update_settings_handler(
             instagram_user_id: identity.user_id,
             username: identity.username,
             access_token: token,
-            token_expires_at: existing.as_ref().and_then(|item| item.token_expires_at.clone()),
+            token_expires_at: existing
+                .as_ref()
+                .and_then(|item| item.token_expires_at.clone()),
             connected_at: existing
                 .map(|item| item.connected_at)
                 .unwrap_or_else(|| Utc::now().format("%Y-%m-%d %H:%M:%S").to_string()),
@@ -372,11 +375,8 @@ pub async fn admin_instagram_sync_handler(
                 .map_err(|e| warp::reject::custom(CustomError::new(e.to_string())))?
         };
 
-        let image = instagram::image_from_instagram_media(
-            &item,
-            &settings.default_import_status,
-            slug,
-        );
+        let image =
+            instagram::image_from_instagram_media(&item, &settings.default_import_status, slug);
 
         {
             let conn_guard = conn.lock().map_err(|_| {
@@ -384,13 +384,14 @@ pub async fn admin_instagram_sync_handler(
                     message: "Internal server error".to_string(),
                 })
             })?;
-            commands::insert_image(&conn_guard, &file_manager, &bytes, &mime_type, image)
-                .map_err(|e| {
+            commands::insert_image(&conn_guard, &file_manager, &bytes, &mime_type, image).map_err(
+                |e| {
                     warp::reject::custom(CustomError::new(format!(
                         "Failed to import Instagram media: {}",
                         e
                     )))
-                })?;
+                },
+            )?;
         }
         imported += 1;
     }
@@ -677,6 +678,12 @@ async fn process_image_form(
     if alt.is_empty() || slug.is_empty() {
         return Err(warp::reject::custom(CustomError::new(
             "Missing required fields".to_string(),
+        )));
+    }
+
+    if !is_valid_slug(&slug) {
+        return Err(warp::reject::custom(CustomError::new(
+            "Invalid slug. Use lowercase letters, numbers, and single hyphens only.".to_string(),
         )));
     }
 
