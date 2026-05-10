@@ -1,5 +1,4 @@
 use crate::commands;
-use crate::config::Config;
 use crate::database;
 use crate::files::ImageFileManager;
 use crate::instagram;
@@ -7,6 +6,7 @@ use crate::models::{
     is_valid_slug, AdminSettingsForm, CustomError, Image, ImageStatusForm, InstagramConnection,
     LoginCredentials,
 };
+use crate::services::instagram_importer;
 use chrono::Utc;
 use rusqlite::Connection;
 use std::sync::{Arc, Mutex};
@@ -241,183 +241,29 @@ pub async fn admin_instagram_disconnect_handler(
 pub async fn admin_instagram_refresh_handler(
     conn: Arc<Mutex<Connection>>,
 ) -> Result<impl Reply, warp::Rejection> {
-    let existing = {
-        let conn_guard = conn.lock().map_err(|_| {
-            warp::reject::custom(CustomError {
-                message: "Internal server error".to_string(),
-            })
-        })?;
-
-        database::get_instagram_connection(&conn_guard).map_err(|e| {
-            warp::reject::custom(CustomError {
-                message: format!("Failed to load Instagram connection: {}", e),
-            })
-        })?
-    };
-
-    let existing = existing.ok_or_else(|| {
-        warp::reject::custom(CustomError::new(
-            "Save an Instagram token before refreshing".to_string(),
-        ))
-    })?;
-
-    let refreshed = instagram::refresh_access_token(&existing.access_token)
+    let result = instagram_importer::refresh_instagram_token(conn)
         .await
         .map_err(warp::reject::custom)?;
-
-    let identity = instagram::fetch_identity(&refreshed.access_token)
-        .await
-        .map_err(warp::reject::custom)?;
-
-    let updated_connection = InstagramConnection {
-        instagram_user_id: identity.user_id,
-        username: identity.username,
-        access_token: refreshed.access_token,
-        token_expires_at: Some(refreshed.token_expires_at),
-        connected_at: existing.connected_at,
-        last_sync_at: existing.last_sync_at,
-    };
-
-    let conn_guard = conn.lock().map_err(|_| {
-        warp::reject::custom(CustomError {
-            message: "Internal server error".to_string(),
-        })
-    })?;
-
-    database::save_instagram_connection(&conn_guard, &updated_connection).map_err(|e| {
-        warp::reject::custom(CustomError {
-            message: format!("Failed to save refreshed Instagram token: {}", e),
-        })
-    })?;
 
     Ok(warp::reply::with_status(
-        "Instagram token refreshed successfully!",
+        format!(
+            "Instagram token refreshed for @{} until {}.",
+            result.username, result.token_expires_at
+        ),
         warp::http::StatusCode::OK,
     ))
 }
 
 pub async fn admin_instagram_sync_handler(
-    _config: Arc<Config>,
     conn: Arc<Mutex<Connection>>,
     file_manager: Arc<ImageFileManager>,
 ) -> Result<impl Reply, warp::Rejection> {
-    let (settings, connection) = {
-        let conn_guard = conn.lock().map_err(|_| {
-            warp::reject::custom(CustomError {
-                message: "Internal server error".to_string(),
-            })
-        })?;
-        let settings = database::get_app_settings(&conn_guard).map_err(|e| {
-            warp::reject::custom(CustomError {
-                message: format!("Failed to load settings: {}", e),
-            })
-        })?;
-        let connection = database::get_instagram_connection(&conn_guard).map_err(|e| {
-            warp::reject::custom(CustomError {
-                message: format!("Failed to load Instagram connection: {}", e),
-            })
-        })?;
-        (settings, connection)
-    };
-
-    let connection = connection.ok_or_else(|| {
-        warp::reject::custom(CustomError::new(
-            "Connect Instagram in settings before syncing".to_string(),
-        ))
-    })?;
-
-    let media = instagram::fetch_recent_media(&connection.access_token)
+    let result = instagram_importer::sync_instagram(conn, file_manager)
         .await
         .map_err(warp::reject::custom)?;
-    let flattened = instagram::flatten_media(&media);
-
-    let mut imported = 0usize;
-    let mut skipped_existing = 0usize;
-    let mut skipped_deleted = 0usize;
-
-    for item in flattened {
-        {
-            let conn_guard = conn.lock().map_err(|_| {
-                warp::reject::custom(CustomError {
-                    message: "Internal server error".to_string(),
-                })
-            })?;
-            match database::get_image_by_source_media_id(&conn_guard, &item.source_media_id) {
-                Ok(existing) => {
-                    if existing.deleted_at.is_some() {
-                        skipped_deleted += 1;
-                    } else {
-                        skipped_existing += 1;
-                    }
-                    continue;
-                }
-                Err(rusqlite::Error::QueryReturnedNoRows) => {}
-                Err(e) => {
-                    return Err(warp::reject::custom(CustomError::new(format!(
-                        "Failed during Instagram dedupe check: {}",
-                        e
-                    ))));
-                }
-            }
-        }
-
-        let (bytes, mime_type) = instagram::download_media(&item.media_url)
-            .await
-            .map_err(warp::reject::custom)?;
-
-        let slug = {
-            let conn_guard = conn.lock().map_err(|_| {
-                warp::reject::custom(CustomError {
-                    message: "Internal server error".to_string(),
-                })
-            })?;
-            unique_slug_for_import(&conn_guard, &item)
-                .map_err(|e| warp::reject::custom(CustomError::new(e.to_string())))?
-        };
-
-        let image =
-            instagram::image_from_instagram_media(&item, &settings.default_import_status, slug);
-
-        {
-            let conn_guard = conn.lock().map_err(|_| {
-                warp::reject::custom(CustomError {
-                    message: "Internal server error".to_string(),
-                })
-            })?;
-            commands::insert_image(&conn_guard, &file_manager, &bytes, &mime_type, image).map_err(
-                |e| {
-                    warp::reject::custom(CustomError::new(format!(
-                        "Failed to import Instagram media: {}",
-                        e
-                    )))
-                },
-            )?;
-        }
-        imported += 1;
-    }
-
-    {
-        let conn_guard = conn.lock().map_err(|_| {
-            warp::reject::custom(CustomError {
-                message: "Internal server error".to_string(),
-            })
-        })?;
-        database::update_instagram_last_sync(
-            &conn_guard,
-            &Utc::now().format("%Y-%m-%d %H:%M:%S").to_string(),
-        )
-        .map_err(|e| {
-            warp::reject::custom(CustomError {
-                message: format!("Failed to record Instagram sync time: {}", e),
-            })
-        })?;
-    }
 
     Ok(warp::reply::with_status(
-        format!(
-            "Instagram sync complete: imported {}, skipped existing {}, skipped deleted {}.",
-            imported, skipped_existing, skipped_deleted
-        ),
+        result.message(),
         warp::http::StatusCode::OK,
     ))
 }
@@ -716,49 +562,4 @@ async fn process_image_form(
         },
         image_data,
     ))
-}
-
-fn unique_slug_for_import(
-    conn: &Connection,
-    item: &instagram::FlattenedInstagramMedia,
-) -> Result<String, Box<dyn std::error::Error>> {
-    let base_caption_slug = instagram::slugify(
-        item.caption
-            .lines()
-            .find(|line| !line.trim().is_empty())
-            .unwrap_or("instagram-import"),
-    );
-    let media_suffix: String = item
-        .source_media_id
-        .chars()
-        .rev()
-        .take(8)
-        .collect::<String>()
-        .chars()
-        .rev()
-        .collect();
-
-    let mut candidate = if base_caption_slug.is_empty() {
-        format!("instagram-{}", media_suffix)
-    } else {
-        base_caption_slug
-    };
-
-    if !database::slug_exists(conn, &candidate)? {
-        return Ok(candidate);
-    }
-
-    candidate = format!("{}-{}", candidate, media_suffix);
-    if !database::slug_exists(conn, &candidate)? {
-        return Ok(candidate);
-    }
-
-    let mut counter = 2;
-    loop {
-        let fallback = format!("{}-{}", candidate, counter);
-        if !database::slug_exists(conn, &fallback)? {
-            return Ok(fallback);
-        }
-        counter += 1;
-    }
 }

@@ -65,9 +65,12 @@
                 {% for image in images %}
                 <div class="admin-gallery-item" data-slug="{{ image.slug }}">
                     <img
-                        src="/images/{{ image.filename}}"
+                        src="{{ image.image_url }}"
+                        srcset="{{ image.srcset }}"
+                        sizes="(max-width: 900px) 100vw, 280px"
                         alt="{{ image.alt }}"
                         loading="lazy"
+                        decoding="async"
                     />
                     <div class="card-header">
                         <h3>{{ image.alt }}</h3>

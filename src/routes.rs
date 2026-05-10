@@ -148,7 +148,6 @@ pub fn admin_routes(
         .and(warp::path("sync"))
         .and(warp::post())
         .and(with_auth(conn.clone()))
-        .and(with_config(config.clone()))
         .and(with_db(conn.clone()))
         .and(with_file_manager(file_manager.clone()))
         .and_then(admin_instagram_sync_handler);

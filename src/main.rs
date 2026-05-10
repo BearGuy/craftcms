@@ -29,6 +29,11 @@ enum Commands {
         #[clap(subcommand)]
         command: ImageCommands,
     },
+    /// Instagram import commands
+    Instagram {
+        #[clap(subcommand)]
+        command: InstagramCommands,
+    },
 }
 
 #[derive(Subcommand)]
@@ -48,6 +53,16 @@ enum UserCommands {
 enum ImageCommands {
     /// Insert a new image from JSON input
     Insert,
+    /// Regenerate responsive image variants for existing images
+    RegenerateVariants,
+}
+
+#[derive(Subcommand)]
+enum InstagramCommands {
+    /// Import new Instagram images using the saved token
+    Sync,
+    /// Refresh the saved long-lived Instagram token
+    RefreshToken,
 }
 
 #[tokio::main]
@@ -65,6 +80,7 @@ async fn main() {
         }
         Commands::Users { command } => {
             let conn = database::init_db().expect("Failed to open database");
+            database::run_migrations(&conn).expect("Failed to run database migrations");
             match command {
                 UserCommands::Create => {
                     if let Err(e) = cli::create_user_command(&conn) {
@@ -88,6 +104,7 @@ async fn main() {
         }
         Commands::Images { command } => {
             let conn = database::init_db().expect("Failed to open database");
+            database::run_migrations(&conn).expect("Failed to run database migrations");
             let file_manager = files::ImageFileManager::new("data/images");
             match command {
                 ImageCommands::Insert => {
@@ -105,6 +122,31 @@ async fn main() {
                         eprintln!(
                             "No input detected. Usage: cat image.json | craftcms images insert"
                         );
+                        std::process::exit(1);
+                    }
+                }
+                ImageCommands::RegenerateVariants => {
+                    if let Err(e) = cli::regenerate_image_variants_command(&conn, &file_manager) {
+                        eprintln!("Error regenerating image variants: {}", e);
+                        std::process::exit(1);
+                    }
+                }
+            }
+        }
+        Commands::Instagram { command } => {
+            let conn = database::init_db().expect("Failed to open database");
+            database::run_migrations(&conn).expect("Failed to run database migrations");
+            match command {
+                InstagramCommands::Sync => {
+                    let file_manager = files::ImageFileManager::new("data/images");
+                    if let Err(e) = cli::sync_instagram_command(conn, file_manager).await {
+                        eprintln!("Error syncing Instagram: {}", e);
+                        std::process::exit(1);
+                    }
+                }
+                InstagramCommands::RefreshToken => {
+                    if let Err(e) = cli::refresh_instagram_token_command(conn).await {
+                        eprintln!("Error refreshing Instagram token: {}", e);
                         std::process::exit(1);
                     }
                 }

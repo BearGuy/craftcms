@@ -1,4 +1,4 @@
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Serialize, Serializer};
 
 pub struct User {
     pub id: i64,
@@ -7,7 +7,7 @@ pub struct User {
     pub access_token: Option<String>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Deserialize)]
 pub struct Image {
     pub alt: String,
     pub description: String,
@@ -20,6 +20,79 @@ pub struct Image {
     pub source_media_id: Option<String>,
     pub source_permalink: Option<String>,
     pub source_timestamp: Option<String>,
+}
+
+impl Serialize for Image {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        #[derive(Serialize)]
+        struct ImageView<'a> {
+            alt: &'a str,
+            description: &'a str,
+            slug: &'a str,
+            keywords: &'a [String],
+            filename: &'a str,
+            status: &'a str,
+            deleted_at: &'a Option<String>,
+            source: &'a str,
+            source_media_id: &'a Option<String>,
+            source_permalink: &'a Option<String>,
+            source_timestamp: &'a Option<String>,
+            image_url: String,
+            srcset: String,
+            variant_480_url: String,
+            variant_960_url: String,
+            variant_1600_url: String,
+        }
+
+        ImageView {
+            alt: &self.alt,
+            description: &self.description,
+            slug: &self.slug,
+            keywords: &self.keywords,
+            filename: &self.filename,
+            status: &self.status,
+            deleted_at: &self.deleted_at,
+            source: &self.source,
+            source_media_id: &self.source_media_id,
+            source_permalink: &self.source_permalink,
+            source_timestamp: &self.source_timestamp,
+            image_url: self.image_url(),
+            srcset: self.srcset(),
+            variant_480_url: self.variant_url(480),
+            variant_960_url: self.variant_url(960),
+            variant_1600_url: self.variant_url(1600),
+        }
+        .serialize(serializer)
+    }
+}
+
+impl Image {
+    pub fn image_url(&self) -> String {
+        format!("/images/{}", self.filename)
+    }
+
+    pub fn variant_filename(&self, width: u32) -> String {
+        let stem = std::path::Path::new(&self.filename)
+            .file_stem()
+            .and_then(|value| value.to_str())
+            .unwrap_or(&self.slug);
+        format!("{}-{}.jpg", stem, width)
+    }
+
+    pub fn variant_url(&self, width: u32) -> String {
+        format!("/images/{}", self.variant_filename(width))
+    }
+
+    pub fn srcset(&self) -> String {
+        [480, 960, 1600]
+            .iter()
+            .map(|width| format!("{} {}w", self.variant_url(*width), width))
+            .collect::<Vec<_>>()
+            .join(", ")
+    }
 }
 
 #[derive(Deserialize)]
@@ -106,6 +179,8 @@ impl fmt::Display for CustomError {
         write!(f, "{}", self.message)
     }
 }
+
+impl std::error::Error for CustomError {}
 
 impl Reject for CustomError {}
 

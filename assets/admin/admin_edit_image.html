@@ -37,7 +37,12 @@
                     <div class="edit-layout">
                         <aside class="edit-sidebar-panel">
                             <div class="detail-preview">
-                                <img src="/images/{{ image.filename }}" alt="{{ image.alt }}" />
+                                <img
+                                    src="{{ image.image_url }}"
+                                    srcset="{{ image.srcset }}"
+                                    sizes="360px"
+                                    alt="{{ image.alt }}"
+                                />
                             </div>
 
                             <div class="detail-list">
@@ -97,7 +102,9 @@
                                     </p>
                                     <div class="image-preview active">
                                         <img
-                                            src="/images/{{ image.filename }}"
+                                            src="{{ image.image_url }}"
+                                            srcset="{{ image.srcset }}"
+                                            sizes="260px"
                                             alt="Current image"
                                         />
                                     </div>

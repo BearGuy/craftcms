@@ -9,6 +9,7 @@ pub mod instagram;
 pub mod middleware;
 pub mod models;
 pub mod routes;
+pub mod services;
 pub mod template_utils;
 pub mod templates;
 

@@ -56,10 +56,13 @@
                     <h2>{{image.alt}}</h2>
                     <div class="tattoo-image-container">
                         <img
-                            src="/images/{{image.slug}}"
+                            src="{{ image.image_url }}"
+                            srcset="{{ image.srcset }}"
+                            sizes="(max-width: 900px) 100vw, 50vw"
                             alt="{{image.alt}}"
                             class="tattoo-image"
                             loading="lazy"
+                            decoding="async"
                         />
                     </div>
                     <p class="tattoo-description">{{ image.description}}</p>

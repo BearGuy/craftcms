@@ -3,6 +3,7 @@ use crate::models::{Image, ImageInput};
 use rusqlite::Connection;
 use serde_json;
 use std::io::{self, Write};
+use std::sync::{Arc, Mutex};
 
 pub fn create_user_command(conn: &Connection) -> Result<(), Box<dyn std::error::Error>> {
     print!("Enter email: ");
@@ -84,4 +85,44 @@ pub fn handle_insert_image(
 
     // Use insert_image_from_path since we have a file path in input.url
     crate::commands::insert_image_from_path(conn, file_manager, &input.url, image)
+}
+
+pub fn regenerate_image_variants_command(
+    conn: &Connection,
+    file_manager: &ImageFileManager,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let images = crate::database::get_admin_images(conn, "all")?;
+    let mut regenerated = 0usize;
+    for image in images {
+        file_manager.regenerate_variants(&image.filename)?;
+        regenerated += 1;
+    }
+    println!("Regenerated variants for {} images.", regenerated);
+    Ok(())
+}
+
+pub async fn sync_instagram_command(
+    conn: Connection,
+    file_manager: ImageFileManager,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let result = crate::services::instagram_importer::sync_instagram(
+        Arc::new(Mutex::new(conn)),
+        Arc::new(file_manager),
+    )
+    .await?;
+    println!("{}", result.message());
+    Ok(())
+}
+
+pub async fn refresh_instagram_token_command(
+    conn: Connection,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let result =
+        crate::services::instagram_importer::refresh_instagram_token(Arc::new(Mutex::new(conn)))
+            .await?;
+    println!(
+        "Instagram token refreshed for @{} until {}.",
+        result.username, result.token_expires_at
+    );
+    Ok(())
 }
