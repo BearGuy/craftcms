@@ -113,9 +113,13 @@ pub async fn run_server() {
     // Admin routes from routes module
     let admin_routes = routes::admin_routes(config.clone(), conn.clone(), file_manager.clone());
 
-    let image_routes = warp::path("images").and(warp::fs::dir("data/images"));
+    let image_routes = warp::path("images")
+        .and(warp::fs::dir("data/images"))
+        .map(|reply| warp::reply::with_header(reply, "Cache-Control", "public, max-age=86400"));
 
-    let static_files = warp::path("static").and(warp::fs::dir("static"));
+    let static_files = warp::path("static")
+        .and(warp::fs::dir("static"))
+        .map(|reply| warp::reply::with_header(reply, "Cache-Control", "public, max-age=86400"));
 
     let routes = home_route
         .or(post_detail_route)

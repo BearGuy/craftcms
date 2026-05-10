@@ -101,6 +101,25 @@ pub fn regenerate_image_variants_command(
     Ok(())
 }
 
+pub fn regenerate_missing_image_variants_command(
+    conn: &Connection,
+    file_manager: &ImageFileManager,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let images = crate::database::get_admin_images(conn, "all")?;
+    let total = images.len();
+    let mut regenerated = 0usize;
+    for image in images {
+        if file_manager.regenerate_missing_variants(&image.filename)? {
+            regenerated += 1;
+        }
+    }
+    println!(
+        "Regenerated missing variants for {} of {} images.",
+        regenerated, total
+    );
+    Ok(())
+}
+
 pub async fn sync_instagram_command(
     conn: Connection,
     file_manager: ImageFileManager,

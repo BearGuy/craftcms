@@ -55,6 +55,8 @@ enum ImageCommands {
     Insert,
     /// Regenerate responsive image variants for existing images
     RegenerateVariants,
+    /// Regenerate responsive image variants only when files are missing
+    RegenerateMissingVariants,
 }
 
 #[derive(Subcommand)]
@@ -128,6 +130,14 @@ async fn main() {
                 ImageCommands::RegenerateVariants => {
                     if let Err(e) = cli::regenerate_image_variants_command(&conn, &file_manager) {
                         eprintln!("Error regenerating image variants: {}", e);
+                        std::process::exit(1);
+                    }
+                }
+                ImageCommands::RegenerateMissingVariants => {
+                    if let Err(e) =
+                        cli::regenerate_missing_image_variants_command(&conn, &file_manager)
+                    {
+                        eprintln!("Error regenerating missing image variants: {}", e);
                         std::process::exit(1);
                     }
                 }

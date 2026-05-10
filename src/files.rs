@@ -112,6 +112,23 @@ impl ImageFileManager {
         self.generate_variants(filename)
     }
 
+    pub fn regenerate_missing_variants(&self, filename: &str) -> std::io::Result<bool> {
+        if self.has_all_variants(filename) {
+            return Ok(false);
+        }
+
+        self.generate_variants(filename)?;
+        Ok(true)
+    }
+
+    fn has_all_variants(&self, filename: &str) -> bool {
+        VARIANT_WIDTHS.iter().all(|width| {
+            self.base_path
+                .join(variant_filename(filename, *width))
+                .exists()
+        })
+    }
+
     fn generate_variants(&self, filename: &str) -> std::io::Result<()> {
         let source_path = self.base_path.join(filename);
         let image = image::open(&source_path).map_err(to_io_error)?;
